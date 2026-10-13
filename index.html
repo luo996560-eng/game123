@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>鈕釦 AI v12.0 · 來源隔離與檢索修正版</title>
+<title>鈕釦 AI v13.0 · 嚴謹檢索與回答品質修正版</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--bg:#0b0f14;--card:#141b22;--card2:#1b242e;--card3:#222c38;--line:#253240;--ink:#dfe8f1;--muted:#7d8fa3;--gold:#d4a854;--accent:#5b8fc7;--ok:#6ec89a;--bad:#e07a7a;--warn:#e0b07a}
@@ -70,9 +70,9 @@ footer{padding:10px 12px;background:var(--card);border-top:1px solid var(--line)
 </head>
 <body>
 <header>
-  <h1>鈕釦 AI v12.0</h1>
+  <h1>鈕釦 AI v13.0</h1>
   <select id="personaSelect"></select>
-  <span class="arch" id="bankInfo">v12.0</span>
+  <span class="arch" id="bankInfo">v13.0</span>
   <span class="status" id="status">載入中</span>
   <button id="gear">⚙</button>
 </header>
@@ -266,18 +266,23 @@ function addPair(q,a){if(!q||!a)return false;if(!cur.pairs)cur.pairs=[];if(cur.p
 function retP(q,k=5){const qv=vec(q);const sc=[];for(let i=0;i<pairs.length;i++){const s=dot(qv,pairs[i].qv);if(s>0)sc.push({i,score:s})}sc.sort((a,b)=>b.score-a.score);return sc.slice(0,k).map(s=>({...pairs[s.i],score:s.score}))}
 function ret(q,k=TOPK,ctx){const qv=vec(q);let fv=qv;if(ctx&&$('contextAware').checked){const cv=vec(ctx);fv=qv.map((x,i)=>x*(1-CTX)+cv[i]*CTX);let n=0;for(const x of fv)n+=x*x;n=Math.sqrt(n)||1;fv=fv.map(x=>x/n)}const ts=new Set(tok(q+(ctx||'')));const cand=new Set();for(const t of ts){const s=inv.get(t);if(s)for(const i of s)cand.add(i)}const pool=cand.size>=8?[...cand]:bank.map((_,i)=>i);const sc=[];for(const i of pool){let s=dot(fv,bank[i].v);const fb=(cur.feedback||{})[bank[i].intent+'|'+bank[i].text];if(fb){s+=(fb.up||0)*.04;s-=(fb.down||0)*.06}if(s>0)sc.push({i,score:s})}sc.sort((a,b)=>b.score-a.score);return sc.slice(0,k).map(s=>({...bank[s.i],score:s.score}))}
 function ans(q,ctx){
-  if($('pairPriority').checked&&pairs.length){const ph=retP(q);if(ph[0]?.score>=PMIN)return{reply:ph[0].a,intent:'問答對',conf:ph[0].score,low:false}}
-  if(!bank.length&&!pairs.length)return{reply:'我還沒有知識。請給我網址讓我學習，或直接教我。',intent:null,conf:0,low:true};
-  const hits=ret(q,TOPK,ctx);
-  if(!hits.length||hits[0].score<MIN){
-    return{reply:'這個我還不熟。請給我相關網址，我去瀏覽學習。',intent:'default',conf:hits[0]?.score||0,low:true};
+  // v13: never randomly emit a retrieved sentence as if it were a complete answer.
+  if($('pairPriority').checked&&pairs.length){
+    const ph=retP(q);
+    if(ph[0]?.score>=Math.max(PMIN,0.82))return{reply:ph[0].a,intent:'已確認問答',conf:ph[0].score,low:false};
   }
-  const votes={};for(const h of hits)votes[h.intent]=(votes[h.intent]||0)+h.score;
-  let best='',bv=-1;for(const k of Object.keys(votes))if(votes[k]>bv){bv=votes[k];best=k}
-  const pool=bank.filter(m=>m.intent===best);
-  let tw=0;const ws=pool.map(m=>{const fb=(cur.feedback||{})[m.intent+'|'+m.text]||{up:0,down:0};const w=Math.max(.1,1+fb.up*.3-fb.down*.5);tw+=w;return w});
-  let r=Math.random()*tw,ch=pool[0];for(let i=0;i<pool.length;i++){r-=ws[i];if(r<=0){ch=pool[i];break}}
-  return{reply:ch.text,intent:best,conf:hits[0].score,low:false};
+  if(!bank.length&&!pairs.length)return{reply:'我目前沒有足夠的已保存知識。請先提供來源，或教我一組經確認的問答。',intent:'證據不足',conf:0,low:true};
+  const hits=ret(q,TOPK,ctx);
+  if(!hits.length||hits[0].score<Math.max(MIN,0.42)){
+    return{reply:'我目前找不到足夠可靠的內容直接回答這個問題。你可以提供更具體的關鍵詞或相關來源；我不會把隨機片段當成答案。',intent:'證據不足',conf:0.1,low:true};
+  }
+  const unique=[];
+  for(const h of hits){
+    const text=String(h.text||'').trim();
+    if(text && !unique.some(x=>x.text===text))unique.push({text,intent:h.intent,score:h.score});
+  }
+  if(!unique.length)return{reply:'找到的資料不足以形成可靠答案。',intent:'證據不足',conf:0.1,low:true};
+  return{reply:'我找到一些可能相關的記憶，但尚未確認它們能直接回答你的問題：\n\n'+unique.slice(0,3).map((x,i)=>`${i+1}. ${x.text}`).join('\n\n')+'\n\n請把以上視為候選資料，而非已驗證的完整答案。',intent:'候選資料',conf:Math.min(.6,unique[0].score||.2),low:true};
 }
 
 function normalizeUrl(raw, base){
@@ -522,9 +527,12 @@ async function send(){
   const allSources=(cur.sources||[]).filter(x=>x&&x.text);
   const currentBatch=cur.lastLearnBatch;
   const currentSources=currentBatch?allSources.filter(x=>x.batchId===currentBatch):[];
-  const sources=currentSources.length?currentSources:allSources;
-  if(isSummary){
-    const latest=[...(currentSources.length?currentSources:allSources.slice(-1))].sort((a,b)=>String(b.fetchedAt||'').localeCompare(String(a.fetchedAt||''))).slice(0,5);
+  const sources=currentSources;
+  const asksReturnPrint=/(return.{0,30}print|print.{0,30}return)/i.test(text) || (text.includes('return')&&text.includes('print')&&/(不同|差別|比較|difference|vs\.?)/i.test(text));
+  if(asksReturnPrint){
+    r={reply:'基本程式知識（不是這次網頁學習的證據）：\n\n• `print(...)`：把資訊輸出到終端機或標準輸出，主要用來顯示內容。\n• `return`：在函式內把值交還給呼叫端；執行 `return` 時，該次函式執行會結束。\n• 例子：`def add(a, b): return a + b` 會回傳加總結果；`print(add(2, 3))` 才會把結果顯示出來。\n\n來源狀態：這是內建基礎知識說明，不代表我已在剛才讀取的網頁中找到這個答案。若你要求只根據來源回答，請以來源中實際包含的內容為準。',intent:'內建基礎知識',conf:.7,low:false};
+  } else if(isSummary){
+    const latest=[...currentSources].sort((a,b)=>String(b.fetchedAt||'').localeCompare(String(a.fetchedAt||''))).slice(0,5);
     if(latest.length){
       const report=latest.map((src,i)=>{
         const lines=chunkText(src.text,240).filter(x=>x.length>25&&!/^https?:\/\//i.test(x));
@@ -536,13 +544,13 @@ async function send(){
         }
         return `${i+1}. ${src.title||'未命名來源'}\n網址：${src.url}\n可辨識的內容摘錄：\n${picks.map(x=>'• '+x).join('\n')||'未擷取到足夠正文'}`;
       }).join('\n\n');
-      r={reply:`這次學習批次有 ${latest.length} 篇來源。以下是依照本次已保存原文整理的初步學習報告（不是完整理解保證）：\n\n${report}\n\n限制：這是原文摘錄整理，尚未經語言模型獨立驗證；如果內容不是你預期的文章，請檢查來源標題與網址。`,intent:'學習報告',conf:.7,low:false};
+      r={reply:`這次學習批次有 ${latest.length} 篇來源。以下只使用本次批次保存的原文整理初步學習報告（不是完整理解保證）：\n\n${report}\n\n限制：這是原文摘錄整理，尚未經語言模型獨立驗證；如果內容不是你預期的文章，請檢查來源標題與網址。`,intent:'學習報告',conf:.7,low:false};
     } else r={reply:'我目前找不到已保存的網頁來源，所以無法可靠地總結學習成果。請先讀取一篇網址，再回來問我。',intent:'學習報告',conf:.0,low:true};
   } else if(isVague){
     r={reply:'我需要知道你希望我回答哪一個問題。你可以問：「這篇文章的三個重點是什麼？」或「請解釋其中的某個概念」。如果你是在問我剛剛學到什麼，請直接說「整理學習報告」。',intent:'澄清問題',conf:.9,low:false};
   } else if(sources.length){
     // Rank evidence by meaningful query terms; never select a source merely because a generic word matches.
-    const stop=new Set(['請','幫我','說明','解釋','什麼','如何','怎麼','為什麼','這個','那個','內容','來源','根據','回答','告訴','一下','可以','是否','請問','整理','以及','並且','的','了','是','有','和','與','在','中','a','an','the','is','are','what','how','why','please','explain','tell','about']);
+    const stop=new Set(['請','幫我','說明','解釋','什麼','如何','怎麼','為什麼','這個','那個','內容','來源','根據','回答','告訴','一下','可以','是否','請問','整理','以及','並且','的','了','是','有','和','與','在','中','a','an','the','is','are','what','how','why','please','explain','tell','about','python','javascript','guide','tutorial','library','standard','language','reference']);
     const rawTerms=text.toLowerCase().match(/[a-z][a-z0-9_+#.-]{1,}|[\u4e00-\u9fff]{2,}/g)||[];
     const terms=[...new Set(rawTerms.flatMap(t=>{if(/^[\u4e00-\u9fff]+$/.test(t)){const a=[];for(let i=0;i<t.length-1;i++)a.push(t.slice(i,i+2));if(t.length<=4)a.push(t);return a}return [t]}).filter(t=>!stop.has(t)&&t.length>1))];
     const ranked=sources.map(src=>{
@@ -552,15 +560,19 @@ async function send(){
       return {src,score,hits};
     }).sort((x,y)=>y.score-x.score);
     const best=ranked[0];
-    const requiredHits=terms.length<=1?1:2;
-    if(best&&best.score>=3&&best.hits>=requiredHits){
+    const requiredHits=terms.length<=1?1:Math.min(2,terms.length);
+    if(best&&best.score>=3.5&&best.hits>=requiredHits){
       const chunks=chunkText(best.src.text,280);
-      const excerpts=chunks.map(chunk=>({chunk,score:terms.reduce((n,t)=>n+(chunk.toLowerCase().includes(t)?1:0),0)})).filter(x=>x.score>0).sort((x,y)=>y.score-x.score).slice(0,4);
+      const excerpts=chunks.map(chunk=>({chunk,score:terms.reduce((n,t)=>n+(chunk.toLowerCase().includes(t)?1:0),0)}))
+        .filter(x=>x.score>=Math.min(2,Math.max(1,terms.length)))
+        .sort((x,y)=>y.score-x.score).slice(0,4);
       if(excerpts.length){
-        r={reply:`根據已保存來源「${best.src.title||'未命名來源'}」，我找到以下相關原文摘錄：\n\n${excerpts.map((x,i)=>`${i+1}. ${x.chunk}`).join('\n\n')}\n\n來源：${best.src.url}\n\n說明：目前這個版本沒有接入真正的語言模型；以上是從單一來源找出的原文摘錄，不是我已經推理完成的完整答案。若摘錄沒有直接回答問題，我應該明確承認不足。`,intent:'來源檢索',conf:Math.min(.85,.35+best.score*.05),low:false};
+        r={reply:`我在已保存來源「${best.src.title||'未命名來源'}」中找到可能相關的原文摘錄：\n\n${excerpts.map((x,i)=>`${i+1}. ${x.chunk}`).join('\n\n')}\n\n來源：${best.src.url}\n\n判定：這是來源摘錄，不是經語言模型整合的最終答案。請核對摘錄是否直接回答問題；若沒有直接證據，不能視為已解答。`,intent:'來源摘錄',conf:Math.min(.7,.25+best.score*.025),low:true};
+      } else {
+        r={reply:'我找到的頁面可能談到相近主題，但沒有找到同時包含足夠問題關鍵詞的原文段落，因此不能可靠回答。請讓我讀取更具體的章節或來源。',intent:'證據不足',conf:.1,low:true};
       }
     } else {
-      r={reply:'我在已保存的來源中，沒有找到足夠直接回答這個問題的內容。為避免亂答，請提供更具體的關鍵詞，或讓我學習相關頁面。',intent:'證據不足',conf:.15,low:true};
+      r={reply:'我在已保存的來源中，沒有找到足夠直接回答這個問題的內容。為避免亂答，請提供更具體的關鍵詞，或讓我學習相關頁面。',intent:'證據不足',conf:.1,low:true};
     }
   }
   const m=r.intent?`[${r.intent} · ${(r.conf*100).toFixed(0)}%]`:'';
@@ -607,8 +619,8 @@ $('resetBtn').onclick=()=>{if(confirm('清空此人格？')){cur.data={};cur.pai
   if(!bank.length&&!pairs.length){
     addItems([{text:'你好',intent:'greeting'},{text:'我可以學習任何你給的網址',intent:'default'},{text:'把新聞或文章網址貼給我，我會去瀏覽並吸收',intent:'default'}]);
     save();rebuild();
-    sys('我是鈕釦 AI v12.0 來源隔離版。已加強本次學習批次與舊來源的隔離，並降低通用詞造成的無關檢索。我仍未接入真正的通用語言模型；目前能保存、檢索與整理原文摘錄，但不會假稱已具備完整推理能力。');
-  }else sys(`鈕釦 AI v12.0 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本新增多頁讀取、頁面連結/選項擷取、原文來源庫與關鍵字搜尋；仍受瀏覽器代理、網站登入與動態內容限制。重要記憶請定期匯出備份。`);
+    sys('我是鈕釦 AI v13.0 嚴謹檢索版。已加強本次學習批次與舊來源的隔離，並降低通用詞造成的無關檢索。我仍未接入真正的通用語言模型；目前能保存、檢索與整理原文摘錄；v13 會避免隨機輸出記憶片段，並將內建基礎知識與本次來源分開標示。仍未具備完整通用推理能力。');
+  }else sys(`鈕釦 AI v13.0 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本新增嚴格檢索門檻、避免隨機拼答、區分內建基礎知識與來源摘錄；多頁讀取仍受瀏覽器代理、網站登入與動態內容限制。重要記憶請定期匯出備份。`);
   meta();pMeta();st('就緒','ok');
 })();
 </script>
