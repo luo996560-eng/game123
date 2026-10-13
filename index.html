@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>鈕釦 AI v14.0 · 網頁學習與回答品質進化版</title>
+<title>鈕釦 AI v15.0 · 網頁學習與回答品質進化版</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--bg:#0b0f14;--card:#141b22;--card2:#1b242e;--card3:#222c38;--line:#253240;--ink:#dfe8f1;--muted:#7d8fa3;--gold:#d4a854;--accent:#5b8fc7;--ok:#6ec89a;--bad:#e07a7a;--warn:#e0b07a}
@@ -70,7 +70,7 @@ footer{padding:10px 12px;background:var(--card);border-top:1px solid var(--line)
 </head>
 <body>
 <header>
-  <h1>鈕釦 AI v14.0</h1>
+  <h1>鈕釦 AI v15.0</h1>
   <select id="personaSelect"></select>
   <span class="arch" id="bankInfo">v13.0</span>
   <span class="status" id="status">載入中</span>
@@ -574,7 +574,7 @@ async function send(){
   } else if(asksReturnPrint){
     r={reply:'基本程式知識（不是這次網頁學習的證據）：\n\n• `print(...)`：把資訊輸出到終端機或標準輸出，主要用來顯示內容。\n• `return`：在函式內把值交還給呼叫端；執行 `return` 時，該次函式執行會結束。\n• 例子：`def add(a, b): return a + b` 會回傳加總結果；`print(add(2, 3))` 才會把結果顯示出來。\n\n來源狀態：這是內建基礎知識說明，不代表我已在剛才讀取的網頁中找到這個答案。若你要求只根據來源回答，請以來源中實際包含的內容為準。',intent:'內建基礎知識',conf:.7,low:false};
   } else if(isSummary){
-    const latest=[...currentSources].sort((a,b)=>String(b.fetchedAt||'').localeCompare(String(a.fetchedAt||''))).slice(0,5);
+    const latest=[...currentSources].sort((a,b)=>String(a.url||'').localeCompare(String(b.url||'')));
     if(latest.length){
       const report=latest.map((src,i)=>{
         const lines=chunkText(src.text,240).map(line=>({line:cleanKnowledgeLine(line),score:scoreContentLine(line)})).filter(x=>x.line&&x.score>0.8);
@@ -585,9 +585,9 @@ async function send(){
           if(!seen.has(key)){seen.add(key);picks.push(line)}
           if(picks.length>=5)break;
         }
-        return `${i+1}. ${src.title||'未命名來源'}\n網址：${src.url}\n可辨識的內容摘錄：\n${picks.map(x=>'• '+x).join('\n')||'未擷取到足夠正文'}`;
+        return `${i+1}. ${src.title||'未命名來源'}\n網址：${src.url}\n擷取時間：${src.fetchedAt||'未知'}\n擷取方式：${src.via||'未記錄'}\n原文保存字元數：${String(src.text||'').length}\n可辨識的內容摘錄（不是全文）：\n${picks.map(x=>'• '+x).join('\n')||'未擷取到足夠正文'}`;
       }).join('\n\n');
-      r={reply:`這次學習批次有 ${latest.length} 篇來源。以下只使用本次批次保存的原文整理初步學習報告（不是完整理解保證）：\n\n${report}\n\n限制：這是原文摘錄整理，尚未經語言模型獨立驗證；如果內容不是你預期的文章，請檢查來源標題與網址。`,intent:'學習報告',conf:.7,low:false};
+      r={reply:`本次學習批次識別碼：${currentBatch}\n本次保存來源：${latest.length} 篇。以下逐篇列出本次批次來源與原文摘錄；摘錄不等於全文理解，也不代表所有連結或互動內容都已讀取。\n\n${report}\n\n品質聲明：目前這是以原文為依據的規則式整理，不是語言模型完成的語意總結。請以每篇的網址、擷取方式和保存字元數核對來源；如有來源不符，代表採集或批次追蹤仍需修正。`,intent:'學習報告',conf:.7,low:false};
     } else r={reply:'我目前找不到已保存的網頁來源，所以無法可靠地總結學習成果。請先讀取一篇網址，再回來問我。',intent:'學習報告',conf:.0,low:true};
   } else if(isVague){
     r={reply:'我需要知道你希望我回答哪一個問題。你可以問：「這篇文章的三個重點是什麼？」或「請解釋其中的某個概念」。如果你是在問我剛剛學到什麼，請直接說「整理學習報告」。',intent:'澄清問題',conf:.9,low:false};
@@ -662,8 +662,8 @@ $('resetBtn').onclick=()=>{if(confirm('清空此人格？')){cur.data={};cur.pai
   if(!bank.length&&!pairs.length){
     addItems([{text:'你好',intent:'greeting'},{text:'我可以學習任何你給的網址',intent:'default'},{text:'把新聞或文章網址貼給我，我會去瀏覽並吸收',intent:'default'}]);
     save();rebuild();
-    sys('我是鈕釦 AI v14.0 嚴謹檢索版。已加強本次學習批次與舊來源的隔離，並降低通用詞造成的無關檢索。我仍未接入真正的通用語言模型；目前能保存、檢索與整理原文摘錄；v13 會避免隨機輸出記憶片段，並將內建基礎知識與本次來源分開標示。仍未具備完整通用推理能力。');
-  }else sys(`鈕釦 AI v14.0 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本新增嚴格檢索門檻、避免隨機拼答、區分內建基礎知識與來源摘錄；多頁讀取仍受瀏覽器代理、網站登入與動態內容限制。重要記憶請定期匯出備份。`);
+    sys('我是鈕釦 AI v15.0 嚴謹檢索版。已加強本次學習批次與舊來源的隔離，並降低通用詞造成的無關檢索。我仍未接入真正的通用語言模型；目前能保存、檢索與整理原文摘錄；v13 會避免隨機輸出記憶片段，並將內建基礎知識與本次來源分開標示。仍未具備完整通用推理能力。');
+  }else sys(`鈕釦 AI v15.0 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本新增嚴格檢索門檻、避免隨機拼答、區分內建基礎知識與來源摘錄；多頁讀取仍受瀏覽器代理、網站登入與動態內容限制。重要記憶請定期匯出備份。`);
   meta();pMeta();st('就緒','ok');
 })();
 </script>
