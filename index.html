@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>鈕釦 AI v15.0 · 網頁學習與回答品質進化版</title>
+<title>鈕釦 AI v17.0 · 網頁學習與回答品質進化版</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--bg:#0b0f14;--card:#141b22;--card2:#1b242e;--card3:#222c38;--line:#253240;--ink:#dfe8f1;--muted:#7d8fa3;--gold:#d4a854;--accent:#5b8fc7;--ok:#6ec89a;--bad:#e07a7a;--warn:#e0b07a}
@@ -70,7 +70,7 @@ footer{padding:10px 12px;background:var(--card);border-top:1px solid var(--line)
 </head>
 <body>
 <header>
-  <h1>鈕釦 AI v15.0</h1>
+  <h1>鈕釦 AI v17.0</h1>
   <select id="personaSelect"></select>
   <span class="arch" id="bankInfo">v13.0</span>
   <span class="status" id="status">載入中</span>
@@ -578,14 +578,19 @@ async function send(){
   } else if(isSourceInventory || isMemoryAudit){
     const stored=(cur.sources||[]).filter(x=>x&&x.url&&x.text);
     const batch=currentBatch ? stored.filter(x=>x.batchId===currentBatch) : [];
-    const list=batch.length ? batch : stored.slice().sort((a,b)=>String(b.fetchedAt||'').localeCompare(String(a.fetchedAt||''))).slice(0,20);
+    const asksStrictCurrent=/(本次|這次|剛才|上一輪|同一批|最新).{0,24}(學習|批次|來源|紀錄|原文|記憶)|(學習|批次|來源|紀錄|原文|記憶).{0,24}(本次|這次|剛才|上一輪|同一批|最新)/.test(text);
+    // Strict audit: if the user asks for the current/previous batch, never substitute unrelated historical sources.
+    const list=asksStrictCurrent ? batch : (batch.length ? batch : stored.slice().sort((a,b)=>String(b.fetchedAt||'').localeCompare(String(a.fetchedAt||''))).slice(0,20));
     if(list.length){
       const batchStatus=batch.length
         ? `目前批次識別碼：${currentBatch}\\n符合本次批次的來源：${batch.length} 篇。`
-        : `目前沒有找到能以批次識別碼確認的來源。\\n以下列出本機保存的最近 ${list.length} 篇來源，但不能保證全部屬於同一次學習。`;
+        : `本機來源清單：${list.length} 篇。以下不是經批次識別碼確認的本次學習來源。`;
       r={reply:`${batchStatus}\\n\\n${list.map((src,i)=>`${i+1}. ${src.title||'未命名來源'}\\n網址：${src.url}\\n擷取時間：${src.fetchedAt||'未記錄'}\\n擷取方式：${src.via||'未記錄'}\\n保存字元數：${String(src.text||'').length}\\n批次標記：${src.batchId||'缺失'}`).join('\\n\\n')}\\n\\n記憶核驗：這份清單來自目前 persona 的本機來源資料。若批次標記缺失或批次識別碼不匹配，我不會假稱已找回指定批次。`,intent:'來源資料清單',conf:1,low:false};
     } else {
-      r={reply:'我在目前 persona 的本機來源資料庫中沒有找到可列出的已保存網頁來源。這表示來源可能未成功保存、目前切換到不同 persona，或瀏覽器儲存資料已遺失。我不能聲稱已記住這次學習。請確認學習完成時有顯示「原文已保存」，並在同一個 persona 下測試。',intent:'來源資料核驗',conf:1,low:false};
+      r={reply:asksStrictCurrent
+        ? '我無法在目前 persona 的本機資料中，找到可由批次識別碼確認的這次學習來源。我不會用舊來源冒充本次結果。可能原因：本次學習未成功保存、重新整理後批次識別碼沒有持久保存、切換了 persona，或瀏覽器清除了本機資料。請回到同一 persona 檢查來源資料庫；若仍找不到，這項記憶測試判定為失敗。'
+        : '我在目前 persona 的本機來源資料庫中沒有找到可列出的已保存網頁來源。這表示來源可能未成功保存、目前切換到不同 persona，或瀏覽器儲存資料已遺失。我不能聲稱已記住這次學習。請確認學習完成時有顯示「原文已保存」，並在同一個 persona 下測試。',
+        intent:'來源資料核驗',conf:1,low:false};
     }
   } else if(isSummary){
     const latest=[...currentSources].sort((a,b)=>String(a.url||'').localeCompare(String(b.url||'')));
@@ -676,8 +681,8 @@ $('resetBtn').onclick=()=>{if(confirm('清空此人格？')){cur.data={};cur.pai
   if(!bank.length&&!pairs.length){
     addItems([{text:'你好',intent:'greeting'},{text:'我可以學習任何你給的網址',intent:'default'},{text:'把新聞或文章網址貼給我，我會去瀏覽並吸收',intent:'default'}]);
     save();rebuild();
-    sys('我是鈕釦 AI v15.0 嚴謹檢索版。已加強本次學習批次與舊來源的隔離，並降低通用詞造成的無關檢索。我仍未接入真正的通用語言模型；目前能保存、檢索與整理原文摘錄；v13 會避免隨機輸出記憶片段，並將內建基礎知識與本次來源分開標示。仍未具備完整通用推理能力。');
-  }else sys(`鈕釦 AI v15.0 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本新增嚴格檢索門檻、避免隨機拼答、區分內建基礎知識與來源摘錄；多頁讀取仍受瀏覽器代理、網站登入與動態內容限制。重要記憶請定期匯出備份。`);
+    sys('我是鈕釦 AI v17.0 嚴謹檢索版。已加強本次學習批次與舊來源的隔離，並降低通用詞造成的無關檢索。我仍未接入真正的通用語言模型；目前能保存、檢索與整理原文摘錄；v13 會避免隨機輸出記憶片段，並將內建基礎知識與本次來源分開標示。仍未具備完整通用推理能力。');
+  }else sys(`鈕釦 AI v17.0 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本新增嚴格檢索門檻、避免隨機拼答、區分內建基礎知識與來源摘錄；多頁讀取仍受瀏覽器代理、網站登入與動態內容限制。重要記憶請定期匯出備份。`);
   meta();pMeta();st('就緒','ok');
 })();
 </script>
