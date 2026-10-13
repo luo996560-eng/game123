@@ -70,9 +70,9 @@ footer{padding:10px 12px;background:var(--card);border-top:1px solid var(--line)
 </head>
 <body>
 <header>
-  <h1>鈕釦 AI</h1>
+  <h1>鈕釦 AI v10.0</h1>
   <select id="personaSelect"></select>
-  <span class="arch" id="bankInfo">v9.1</span>
+  <span class="arch" id="bankInfo">v10.0</span>
   <span class="status" id="status">載入中</span>
   <button id="gear">⚙</button>
 </header>
@@ -90,7 +90,7 @@ footer{padding:10px 12px;background:var(--card);border-top:1px solid var(--line)
     <div class="tab-content active" id="tab-url">
       <div class="infobox">
         <b>正確的學習方式</b><br>
-        給我一個網址（新聞、文章、部落格…），我會連上去瀏覽頁面內容，吸收裡面的資訊、用詞與寫作方式，自動變成我的知識與意圖。
+        貼上網址後，鈕釦會嘗試讀取文章正文、標題、段落、清單、表格、連結、表單選項與結構化資料；並可沿著同網站連結繼續讀取多頁。原文會保留在本機「來源資料庫」，另整理成可檢索的知識片段。<b>限制：</b>登入牆、付費牆、網站反爬蟲、JavaScript 動態內容或代理失效時，瀏覽器版仍可能讀不到，不能保證任何網站的每個字都抓得到。
       </div>
       <label>網址（必填）</label>
       <input type="url" id="learnUrl" placeholder="https://news.example.com/article/123">
@@ -98,7 +98,12 @@ footer{padding:10px 12px;background:var(--card);border-top:1px solid var(--line)
       <input type="text" id="learnIntent" placeholder="例如：科技新聞、寫作風格、健康知識">
       <div class="toggle-row"><input type="checkbox" id="autoIntent" checked><span>自動根據頁面標題建立意圖</span></div>
       <div class="toggle-row"><input type="checkbox" id="learnStyle" checked><span>同時學習用詞與句子結構</span></div>
-      <div class="toggle-row"><input type="checkbox" id="makePairs" checked><span>自動產生問答對</span></div>
+      <div class="toggle-row"><input type="checkbox" id="makePairs" checked><span>自動產生問答對（只作候選，不代表已驗證）</span></div>
+      <label>爬取範圍</label>
+      <div class="row">
+        <select id="crawlPages" style="flex:1"><option value="1">只讀這一頁</option><option value="3">最多 3 頁</option><option value="5" selected>最多 5 頁</option><option value="8">最多 8 頁</option><option value="12">最多 12 頁</option></select>
+        <select id="crawlScope" style="flex:1"><option value="same" selected>只跟進同網站連結</option><option value="none">不跟進連結</option></select>
+      </div>
       <div class="row">
         <button id="learnUrlBtn">開始瀏覽並學習</button>
         <button id="previewBtn" class="ghost">只預覽不學習</button>
@@ -106,6 +111,10 @@ footer{padding:10px 12px;background:var(--card);border-top:1px solid var(--line)
       <div class="progress" id="progress"><i id="progBar"></i></div>
       <div id="learnResult" class="learn-result" style="display:none"></div>
       <div class="meta" id="urlMeta"></div>
+      <label>來源資料庫（已保存的原文）</label>
+      <input id="sourceSearch" type="search" placeholder="搜尋已讀文章、網址或關鍵字">
+      <div class="row"><button id="searchSourcesBtn" class="ghost">搜尋來源</button><button id="showSourcesBtn" class="ghost">查看已保存來源</button></div>
+      <div id="sourceResults" class="learn-result" style="display:none"></div>
     </div>
 
     <div class="tab-content" id="tab-pair">
@@ -149,7 +158,7 @@ footer{padding:10px 12px;background:var(--card);border-top:1px solid var(--line)
       <div class="toggle-row"><input type="checkbox" id="useMarkov" checked><span>組合生成</span></div>
       <div class="toggle-row"><input type="checkbox" id="autoSpeak"><span>自動朗讀</span></div>
       <div class="toggle-row"><input type="checkbox" id="pairPriority" checked><span>問答對優先</span></div>
-      <div class="warnbox">安全提醒：網址學習會把網址交給第三方公開代理，請勿輸入含私人資訊的網址。網站內容可能不完整，也不會因為抓取成功就自動成為已驗證事實。重要記憶請定期匯出 JSON 備份；瀏覽器儲存仍可能因清除網站資料或容量限制而遺失。</div>
+      <div class="warnbox">安全與能力邊界：為繞過瀏覽器跨網域限制，可能會將公開網址交給第三方讀取代理；不要輸入私人、內網或帶有登入權杖的網址。網站若要求登入、使用動態腳本、封鎖代理或只提供部分內容，仍可能無法完整讀取。此版會保存抓到的原文與來源，並依關鍵字檢索；它不是大型語言模型，不能只靠抓取就真正理解所有知識或保證答案正確。重要資料請定期匯出備份。</div>
     </div>
 
     <div class="errbox" id="errBox"></div>
@@ -205,7 +214,7 @@ function extractMain(html){
   return clean(main);
 }
 
-function defP(){return{data:{},pairs:[],feedback:{}}}
+function defP(){return{data:{},pairs:[],feedback:{},sources:[],candidates:[]}}
 const BACKUP_LS=LS+'_backup_v1';
 function validRoot(o){
   return !!o && typeof o==='object' && o.personas && typeof o.personas==='object'
@@ -273,85 +282,186 @@ function ans(q,ctx){
   return{reply:ch.text,intent:best,conf:hits[0].score,low:false};
 }
 
-async function fetchPage(url){
-  let parsed;
-  try{parsed=new URL(url)}catch(e){return null}
-  if(!['http:','https:'].includes(parsed.protocol)||parsed.username||parsed.password)return null;
-  const proxies=[
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(parsed.href)}`,
-    `https://corsproxy.io/?${encodeURIComponent(parsed.href)}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(parsed.href)}`
-  ];
-  for(const p of proxies){
-    const c=new AbortController();
-    const t=setTimeout(()=>c.abort(),18000);
-    try{
-      const r=await fetch(p,{signal:c.signal,redirect:'follow'});
-      if(r.ok){const txt=await r.text();if(txt&&txt.length>100)return txt}
-    }catch(e){}finally{clearTimeout(t)}
-  }
-  return null;
+function normalizeUrl(raw, base){
+  try{const u=new URL(raw,base);if(!['http:','https:'].includes(u.protocol)||u.username||u.password)return null;u.hash='';return u.href}catch(e){return null}
 }
-
-async function deepLearnFromUrl(url, doLearn=true){
-  if(!url||!/^https?:\/\//i.test(url)){err('請輸入完整網址（https://...）');return null}
-  $('progress').style.display='block';$('progBar').style.width='10%';
-  st('連線中…','busy');
-  $('learnResult').style.display='none';
-
-  const html=await fetchPage(url);
-  if(!html){err('無法取得頁面內容。可能是網站阻擋或代理限制。');st('失敗');$('progress').style.display='none';return null}
-
-  $('progBar').style.width='45%';
-  const title=extractTitle(html)||'網頁內容';
-  const mainText=extractMain(html);
-  const sents=split(mainText).filter(s=>{
-    const cjk=(s.match(/[\u4e00-\u9fff]/g)||[]).length;
-    return cjk>=3||s.length>=12;
+function htmlToPage(raw, url){
+  // Jina may return readable Markdown/plain text rather than HTML.
+  if(!/<(?:html|body|article|main|p|div|h[1-6]|table|form|a)\b/i.test(raw)){
+    const title=(raw.match(/^(?:Title|標題):\s*(.+)$/mi)||[])[1]||url;
+    const links=[...raw.matchAll(/\[[^\]]{1,180}\]\((https?:\/\/[^)\s]+)\)/g)].map(m=>m[1]);
+    return {title:title.slice(0,180),text:raw.replace(/\r/g,''),links:[...new Set(links)],controls:[],html:false};
+  }
+  let doc;
+  try{doc=new DOMParser().parseFromString(raw,'text/html')}catch(e){return {title:extractTitle(raw)||url,text:clean(raw),links:[],controls:[],html:false}}
+  doc.querySelectorAll('script,style,noscript,svg,canvas,iframe,template,nav,footer,header,aside,[hidden],[aria-hidden="true"]').forEach(n=>n.remove());
+  const title=(doc.querySelector('meta[property="og:title"]')?.content||doc.querySelector('title')?.textContent||doc.querySelector('h1')?.textContent||url).trim().slice(0,180);
+  const parts=[];
+  const selectors='h1,h2,h3,h4,h5,h6,p,li,blockquote,td,th,caption,summary,dt,dd,pre,code,figcaption,article,main';
+  doc.querySelectorAll(selectors).forEach(n=>{
+    const t=(n.innerText||n.textContent||'').replace(/\s+/g,' ').trim();
+    if(t.length>=2 && t.length<=12000 && !parts.includes(t))parts.push(t);
   });
-
-  $('progBar').style.width='75%';
-
-  let intent=$('learnIntent').value.trim();
-  if(!intent&&$('autoIntent').checked){
-    intent=title.slice(0,20).replace(/[^\u4e00-\u9fffa-zA-Z0-9]/g,'')||'web_'+Date.now().toString(36);
+  // Capture forms and choices: labels, inputs, select options, buttons, accessible names.
+  const controls=[];
+  doc.querySelectorAll('form,select,option,input,textarea,button,[role="option"],[role="menuitem"],[aria-label],[title]').forEach(n=>{
+    const tag=n.tagName.toLowerCase(), label=(n.getAttribute('aria-label')||n.getAttribute('title')||n.getAttribute('placeholder')||n.labels?.[0]?.innerText||'').trim();
+    let val='';
+    if(tag==='option')val=(n.textContent||'').trim();
+    else if(tag==='select')val=[...n.options].map(o=>(o.textContent||'').trim()).filter(Boolean).join(' / ');
+    else if(tag==='input')val=[n.type,n.name,n.value].filter(Boolean).join(': ');
+    else if(tag==='textarea')val=[n.name,n.placeholder].filter(Boolean).join(': ');
+    else val=(n.innerText||n.textContent||'').trim();
+    const line=[tag,label,val].filter(Boolean).join(' — ').replace(/\s+/g,' ').trim();
+    if(line.length>1&&line.length<1200&&!controls.includes(line))controls.push(line);
+  });
+  const metas=[...doc.querySelectorAll('meta[name="description"],meta[property^="og:"],meta[name="keywords"]')]
+    .map(m=>[m.getAttribute('name')||m.getAttribute('property'),m.content].filter(Boolean).join(': ')).filter(Boolean);
+  const jsonld=[...doc.querySelectorAll('script[type="application/ld+json"]')].map(n=>n.textContent||'').filter(Boolean);
+  const text=[...metas,...parts,...controls,...jsonld.map(x=>'結構化資料：'+x.slice(0,8000))].join('\n').replace(/\n{3,}/g,'\n\n');
+  const links=[...doc.querySelectorAll('a[href]')].map(a=>normalizeUrl(a.getAttribute('href'),url)).filter(Boolean);
+  return {title,text,links:[...new Set(links)],controls,html:true};
+}
+async function fetchPage(url){
+  const normalized=normalizeUrl(url);
+  if(!normalized)return {error:'網址格式不正確，只接受 http 或 https。'};
+  const proxies=[
+    {name:'AllOrigins',url:`https://api.allorigins.win/raw?url=${encodeURIComponent(normalized)}`},
+    {name:'corsproxy.io',url:`https://corsproxy.io/?url=${encodeURIComponent(normalized)}`},
+    {name:'CodeTabs',url:`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(normalized)}`},
+    {name:'Jina Reader',url:`https://r.jina.ai/${normalized}`}
+  ];
+  const failures=[];
+  for(const proxy of proxies){
+    const c=new AbortController();const timer=setTimeout(()=>c.abort(),15000);
+    try{
+      const r=await fetch(proxy.url,{signal:c.signal,headers:{'Accept':'text/html,text/plain,text/markdown,*/*'}});
+      if(!r.ok){failures.push(proxy.name+': HTTP '+r.status);continue}
+      const txt=await r.text();
+      if(txt&&txt.length>80&&!/cloudflare ray id|access denied|enable javascript to continue/i.test(txt.slice(0,2500))){
+        return {raw:txt,via:proxy.name,url:normalized};
+      }
+      failures.push(proxy.name+': 空白或封鎖頁面');
+    }catch(e){failures.push(proxy.name+': '+(e.name==='AbortError'?'逾時':'連線失敗'))}
+    finally{clearTimeout(timer)}
   }
-  if(!intent)intent='web_learn';
-
-  const preview=`標題：${title}\n意圖：${intent}\n有效句子：${sents.length} 句\n\n前幾句預覽：\n`+sents.slice(0,6).map((s,i)=>(i+1)+'. '+s).join('\n');
-  $('learnResult').style.display='block';
-  $('learnResult').textContent=preview;
-
-  if(!doLearn){
-    $('progBar').style.width='100%';
-    st('預覽完成','ok');
-    setTimeout(()=>$('progress').style.display='none',400);
-    return {title,intent,sents};
-  }
-
-  const items=sents.map(t=>({text:t,intent}));
-  const res=addItems(items);
-
-  if($('learnStyle').checked){
-    const styleSents=sents.filter(s=>s.length>25&&s.length<120).slice(0,15);
-    addItems(styleSents.map(t=>({text:t,intent:intent+'_風格'})));
-  }
-
-  if($('makePairs').checked&&sents.length){
-    if(title)addPair(title, sents.slice(0,2).join(''));
-    for(const s of sents.slice(0,8)){
-      if(s.length>20&&s.length<100)addPair(s.slice(0,12)+'是什麼？',s);
+  return {error:'所有讀取通道都失敗。常見原因：網站封鎖、需要登入、代理暫時故障或 iPhone 網路限制。嘗試開啟文章的公開版本，或改貼文章內頁網址。',details:failures.join('\n')};
+}
+function chunkText(text, max=220){
+  const out=[];
+  for(const para of String(text||'').split(/\n+/)){
+    const p=para.trim();if(!p)continue;
+    const sentences=p.split(/(?<=[。！？.!?；;])\s*/).map(x=>x.trim()).filter(Boolean);
+    for(const sent of sentences){
+      if(sent.length<=max){if(sent.length>=2)out.push(sent);continue}
+      for(let i=0;i<sent.length;i+=max){const part=sent.slice(i,i+max).trim();if(part.length>=2)out.push(part)}
     }
   }
-
-  save();rebuild();learned+=res.a;
-  $('progBar').style.width='100%';
-  st('學習完成','ok');
-  meta();pMeta();
-  sys(`已從「${title}」學習完成\n意圖「${intent}」新增 ${res.a} 句（跳過 ${res.s}）\n目前總記憶 ${bank.length} 句`);
-  ok(`成功吸收 ${res.a} 句知識`);
-  setTimeout(()=>$('progress').style.display='none',500);
-  return {title,intent,sents,added:res.a};
+  return out;
+}
+function crawlLinks(page, base, host){
+  return page.links.map(x=>normalizeUrl(x,base)).filter(Boolean).filter(x=>{
+    try{const u=new URL(x);return u.hostname===host&&!/\.(?:jpg|jpeg|png|gif|webp|svg|pdf|zip|mp4|mp3|css|js|ico)(?:$|\?)/i.test(u.pathname)}
+    catch(e){return false}
+  });
+}
+function sourceSearch(q, limit=6){
+  const query=String(q||'').toLowerCase().trim();if(!query)return (cur.sources||[]).slice(-limit).reverse();
+  const terms=[...new Set(tok(query).filter(x=>x.length>=1))];const scored=[];
+  for(const src of (cur.sources||[])){
+    const hay=(src.title+' '+src.url+' '+src.text).toLowerCase();let score=0;
+    if(src.title.toLowerCase().includes(query))score+=4;
+    if(src.url.toLowerCase().includes(query))score+=2;
+    for(const term of terms){if(hay.includes(term))score+=term.length>1?1.2:.3}
+    if(score>0)scored.push({src,score});
+  }
+  return scored.sort((a,b)=>b.score-a.score).slice(0,limit).map(x=>x.src);
+}
+function showSourceResults(q){
+  const box=$('sourceResults');box.style.display='block';
+  const results=sourceSearch(q,8);
+  if(!results.length){box.textContent='目前沒有找到符合的來源。請先讀取網址，或改用文章標題／網址中的關鍵字搜尋。';return}
+  box.replaceChildren();
+  for(const src of results){
+    const d=document.createElement('div');d.style.cssText='padding:10px 0;border-bottom:1px solid var(--line)';
+    const title=document.createElement('b');title.textContent=src.title||'未命名來源';d.appendChild(title);
+    const meta=document.createElement('div');meta.className='meta';meta.textContent=`${src.url}｜${src.pages||1} 頁｜${(src.text||'').length.toLocaleString()} 字元｜${src.fetchedAt||''}`;d.appendChild(meta);
+    const body=document.createElement('div');body.style.whiteSpace='pre-wrap';body.textContent=(src.text||'').slice(0,1600)+(src.text?.length>1600?'…':'');d.appendChild(body);
+    const b=document.createElement('button');b.className='ghost';b.textContent='用這篇來源回答問題';b.onclick=()=>{ $('input').value='請根據這個來源回答：'+(src.title||src.url)+'\n'+$('sourceSearch').value; $('input').focus(); };d.appendChild(b);box.appendChild(d);
+  }
+}
+async function deepLearnFromUrl(url, doLearn=true){
+  const first=normalizeUrl(url);
+  if(!first){err('請輸入有效的完整網址（https://...）。');return null}
+  $('progress').style.display='block';$('progBar').style.width='3%';$('learnResult').style.display='none';
+  st('準備讀取…','busy');
+  const maxPages=$('crawlScope').value==='none'?1:Math.max(1,Math.min(12,Number($('crawlPages').value)||5));
+  let queue=[first],seen=new Set(),pages=[],failed=[];
+  let rootHost='';try{rootHost=new URL(first).hostname}catch(e){}
+  while(queue.length&&pages.length<maxPages){
+    const target=queue.shift();if(seen.has(target))continue;seen.add(target);
+    st(`正在讀取第 ${pages.length+1} 頁（最多 ${maxPages} 頁）…`,'busy');
+    $('progBar').style.width=Math.min(90,5+Math.round((pages.length/maxPages)*80))+'%';
+    const fetched=await fetchPage(target);
+    if(fetched.error){failed.push(target+'：'+fetched.error);continue}
+    const page=htmlToPage(fetched.raw,target);
+    if(!page.text||page.text.trim().length<30){failed.push(target+'：讀到的正文太少');continue}
+    pages.push({url:target,title:page.title||target,text:page.text.slice(0,45000),controls:page.controls||[],via:fetched.via,links:page.links.length});
+    if(pages.length<maxPages&&$('crawlScope').value==='same'){
+      for(const link of crawlLinks(page,target,rootHost)){if(!seen.has(link)&&!queue.includes(link)&&queue.length<80)queue.push(link)}
+    }
+  }
+  if(!pages.length){
+    $('progress').style.display='none';st('讀取失敗');
+    err('無法讀取這個網址。\n'+(failed[0]||'網站可能封鎖讀取代理。')+'\n\n試試：直接貼文章內頁網址、確認不需登入、或改用公開可讀的文章頁。');
+    const box=$('learnResult');box.style.display='block';box.textContent=failed.slice(0,4).join('\n\n');
+    return null;
+  }
+  $('progBar').style.width='65%';
+  const baseTitle=pages[0].title||'網頁來源';
+  let intent=$('learnIntent').value.trim();
+  if(!intent&&$('autoIntent').checked)intent=baseTitle.slice(0,36).replace(/[^\u4e00-\u9fffa-zA-Z0-9 _-]/g,'').trim()||'web_'+Date.now().toString(36);
+  if(!intent)intent='web_learn';
+  const allItems=[],sourceRecords=[];
+  for(const pg of pages){
+    const chunks=chunkText(pg.text,220).filter(t=>t.length>=2);
+    for(const t of chunks)allItems.push({text:t,intent});
+    if($('learnStyle').checked){
+      for(const t of chunks.filter(x=>x.length>28&&x.length<150).slice(0,40))allItems.push({text:t,intent:intent+'_風格'});
+    }
+    sourceRecords.push({url:pg.url,title:pg.title,text:pg.text,controls:pg.controls,fetchedAt:new Date().toISOString(),via:pg.via,pages:1});
+  }
+  const totalChars=pages.reduce((n,p)=>n+p.text.length,0);
+  const preview=`主頁：${baseTitle}\n意圖：${intent}\n成功讀取：${pages.length} 頁／目標最多 ${maxPages} 頁\n原文總量：約 ${totalChars.toLocaleString()} 字元\n知識片段：${allItems.length} 段\n讀取方式：${[...new Set(pages.map(p=>p.via))].join('、')}\n\n頁面清單：\n`+pages.map((p,i)=>`${i+1}. ${p.title}\n   ${p.url}\n   ${p.text.length.toLocaleString()} 字元｜連結 ${p.links} 個｜選項/控制項 ${p.controls.length} 個`).join('\n')+
+    (failed.length?`\n\n失敗/略過：${failed.length} 項\n${failed.slice(0,4).join('\n')}`:'')+
+    `\n\n原文摘錄：\n${pages[0].text.slice(0,1800)}`;
+  $('learnResult').style.display='block';$('learnResult').textContent=preview;
+  if(!doLearn){$('progBar').style.width='100%';st('預覽完成','ok');setTimeout(()=>$('progress').style.display='none',400);return{title:baseTitle,intent,pages,totalChars,failed}}
+  const res=addItems(allItems);
+  if(!cur.sources)cur.sources=[];
+  for(const rec of sourceRecords){
+    const old=cur.sources.findIndex(x=>x.url===rec.url);
+    if(old>=0)cur.sources[old]=rec;else cur.sources.push(rec);
+  }
+  // Keep the source corpus bounded so localStorage does not grow without limit.
+  while(cur.sources.length>80 || cur.sources.reduce((n,x)=>n+String(x.text||'').length,0)>450000)cur.sources.shift();
+  if($('makePairs').checked&&pages.length){
+    for(const pg of pages.slice(0,5)){
+      const title=pg.title||baseTitle;
+      if(title&&pg.text.length>30)addPair('請摘要：'+title,pg.text.slice(0,900));
+      const chunks=chunkText(pg.text,220);
+      for(const chunk of chunks.slice(0,12)){
+        if(chunk.length>25&&chunk.length<180)addPair('根據來源，'+chunk.slice(0,18)+'…是什麼？',chunk);
+      }
+    }
+  }
+  const saved=save();rebuild();learned+=res.a;
+  $('progBar').style.width='100%';st(saved?'學習完成':'儲存失敗',saved?'ok':'');
+  meta();pMeta();showSourceResults('');
+  sys(`網址學習完成：${pages.length} 頁，原文約 ${totalChars.toLocaleString()} 字元，新增知識片段 ${res.a} 段（重複 ${res.s} 段）。原文已保存到來源資料庫；讀取失敗 ${failed.length} 項。`);
+  ok(saved?`讀取 ${pages.length} 頁並整理 ${res.a} 段知識。請查看頁面清單和來源資料庫。`:'知識已整理，但本機儲存失敗，請立即匯出或減少來源數量。');
+  setTimeout(()=>$('progress').style.display='none',600);
+  return {title:baseTitle,intent,pages,totalChars,added:res.a,failed};
 }
 
 function st(t,ty){const s=$('status');s.textContent=t;s.className='status'+(ty==='ok'?' ok':ty==='busy'?' busy':'')}
@@ -410,7 +520,17 @@ async function send(){
 
   await sleep(30);
   let ctx='';if($('contextAware').checked)ctx=hist.filter(h=>h.role==='user'||h.role==='ai').slice(-5).map(h=>h.content).join(' ');
-  const r=ans(text,ctx);
+  let r=ans(text,ctx);
+  const sourceQuery=text.replace(/^請根據這個來源回答：/,'').trim();
+  const found=sourceSearch(sourceQuery,3);
+  if(found.length && text.length>=2){
+    const best=found[0];
+    const qterms=[...new Set(tok(sourceQuery).filter(x=>x.length>=2))];
+    const excerpt=chunkText(best.text,260).map(chunk=>({chunk,score:qterms.reduce((n,t)=>n+(chunk.toLowerCase().includes(t.toLowerCase())?1:0),0)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,3);
+    if(excerpt.length && (excerpt[0].score>=2 || best.text.toLowerCase().includes(text.toLowerCase()))){
+      r={reply:`我在已保存來源「${best.title}」找到相關內容：\n\n${excerpt.map((x,i)=>`${i+1}. ${x.chunk}`).join('\n\n')}\n\n來源：${best.url}\n\n提醒：這是來源原文的檢索摘錄，不代表我已驗證其正確性。`,intent:'來源檢索',conf:Math.min(.95,.35+excerpt[0].score*.1),low:false};
+    }
+  }
   const m=r.intent?`[${r.intent} · ${(r.conf*100).toFixed(0)}%]`:'';
   addMsg('ai',r.reply,m,{intent:r.intent,text:r.reply});
   hist.push({role:'ai',content:r.reply,meta:m});saveH();
@@ -428,6 +548,9 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelect
 
 $('learnUrlBtn').onclick=()=>deepLearnFromUrl($('learnUrl').value.trim(),true);
 $('previewBtn').onclick=()=>deepLearnFromUrl($('learnUrl').value.trim(),false);
+$('searchSourcesBtn').onclick=()=>showSourceResults($('sourceSearch').value);
+$('sourceSearch').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();showSourceResults($('sourceSearch').value)}};
+$('showSourcesBtn').onclick=()=>showSourceResults('');
 
 $('addPairBtn').onclick=()=>{const q=$('pairQ').value.trim(),a=$('pairA').value.trim();if(!q||!a)return;if(addPair(q,a)){save();rebuild();pMeta();meta();$('pairQ').value='';$('pairA').value='';ok('已加入');sys('問答對已加入')}};
 $('addBtn').onclick=()=>{const raw=$('newData').value.trim();if(!raw)return;const items=[];for(const line of raw.split('\n')){const p=line.split('|').map(x=>x.trim()).filter(Boolean);if(p.length<2)continue;for(let i=1;i<p.length;i++)items.push({text:p[i],intent:p[0]})}const res=addItems(items);save();rebuild();meta();$('newData').value='';sys('加入 '+res.a+' 句');ok('完成')};
@@ -452,8 +575,8 @@ $('resetBtn').onclick=()=>{if(confirm('清空此人格？')){cur.data={};cur.pai
   if(!bank.length&&!pairs.length){
     addItems([{text:'你好',intent:'greeting'},{text:'我可以學習任何你給的網址',intent:'default'},{text:'把新聞或文章網址貼給我，我會去瀏覽並吸收',intent:'default'}]);
     save();rebuild();
-    sys('我是鈕釦 AI v9.1 安全與記憶修正版。可保存問答、整理網頁文字及管理本機記憶；目前尚未接入真正的通用語言模型，因此不能宣稱已精通程式設計。請先匯出備份，再開始累積重要資料。');
-  }else sys(`鈕釦 AI v9.1 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本先改善安全與資料保存；網頁文字擷取不等於真正的模型理解，程式專家模型尚待下一階段整合。重要記憶請定期匯出備份。`);
+    sys('我是鈕釦 AI v10.0 網頁深讀版。可保存問答、整理網頁文字及管理本機記憶；目前尚未接入真正的通用語言模型，因此不能宣稱已精通程式設計。請先匯出備份，再開始累積重要資料。');
+  }else sys(`鈕釦 AI v10.0 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本新增多頁讀取、頁面連結/選項擷取、原文來源庫與關鍵字搜尋；仍受瀏覽器代理、網站登入與動態內容限制。重要記憶請定期匯出備份。`);
   meta();pMeta();st('就緒','ok');
 })();
 </script>
