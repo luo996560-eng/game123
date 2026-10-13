@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>鈕釦 AI v11.0 · 知識檢索修正版</title>
+<title>鈕釦 AI v12.0 · 來源隔離與檢索修正版</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--bg:#0b0f14;--card:#141b22;--card2:#1b242e;--card3:#222c38;--line:#253240;--ink:#dfe8f1;--muted:#7d8fa3;--gold:#d4a854;--accent:#5b8fc7;--ok:#6ec89a;--bad:#e07a7a;--warn:#e0b07a}
@@ -70,9 +70,9 @@ footer{padding:10px 12px;background:var(--card);border-top:1px solid var(--line)
 </head>
 <body>
 <header>
-  <h1>鈕釦 AI v11.0</h1>
+  <h1>鈕釦 AI v12.0</h1>
   <select id="personaSelect"></select>
-  <span class="arch" id="bankInfo">v11.0</span>
+  <span class="arch" id="bankInfo">v12.0</span>
   <span class="status" id="status">載入中</span>
   <button id="gear">⚙</button>
 </header>
@@ -288,7 +288,8 @@ function htmlToPage(raw, url){
   if(!/<(?:html|body|article|main|p|div|h[1-6]|table|form|a)\b/i.test(raw)){
     const title=(raw.match(/^(?:Title|標題):\s*(.+)$/mi)||[])[1]||url;
     const links=[...raw.matchAll(/\[[^\]]{1,180}\]\((https?:\/\/[^)\s]+)\)/g)].map(m=>m[1]);
-    return {title:title.slice(0,180),text:raw.replace(/\r/g,''),links:[...new Set(links)],controls:[],html:false};
+    const cleaned=raw.replace(/^(?:Warning: This is a cached snapshot[\s\S]*?opt-out\.?\s*)/i,'').replace(/^\s*Title:\s*[^\n]+\n/i,'').trim();
+    return {title:title.slice(0,180),text:cleaned,links:[...new Set(links)],controls:[],html:false};
   }
   let doc;
   try{doc=new DOMParser().parseFromString(raw,'text/html')}catch(e){return {title:extractTitle(raw)||url,text:clean(raw),links:[],controls:[],html:false}}
@@ -333,10 +334,11 @@ async function fetchPage(url){
   for(const proxy of proxies){
     const c=new AbortController();const timer=setTimeout(()=>c.abort(),15000);
     try{
-      const r=await fetch(proxy.url,{signal:c.signal,headers:{'Accept':'text/html,text/plain,text/markdown,*/*'}});
+      const headers={'Accept':'text/html,text/plain,text/markdown,*/*'};if(proxy.name==='Jina Reader')headers['x-no-cache']='true';
+      const r=await fetch(proxy.url,{signal:c.signal,headers});
       if(!r.ok){failures.push(proxy.name+': HTTP '+r.status);continue}
       const txt=await r.text();
-      if(txt&&txt.length>80&&!/cloudflare ray id|access denied|enable javascript to continue/i.test(txt.slice(0,2500))){
+      if(txt&&txt.length>80&&!/cloudflare ray id|access denied|enable javascript to continue|cached snapshot of the original page|consider retry with caching opt-out/i.test(txt.slice(0,5000))){
         return {raw:txt,via:proxy.name,url:normalized};
       }
       failures.push(proxy.name+': 空白或封鎖頁面');
@@ -421,13 +423,14 @@ async function deepLearnFromUrl(url, doLearn=true){
   if(!intent&&$('autoIntent').checked)intent=baseTitle.slice(0,36).replace(/[^\u4e00-\u9fffa-zA-Z0-9 _-]/g,'').trim()||'web_'+Date.now().toString(36);
   if(!intent)intent='web_learn';
   const allItems=[],sourceRecords=[];
+  const batchId='learn_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7);
   for(const pg of pages){
     const chunks=chunkText(pg.text,220).filter(t=>t.length>=2);
     for(const t of chunks)allItems.push({text:t,intent});
     if($('learnStyle').checked){
       for(const t of chunks.filter(x=>x.length>28&&x.length<150).slice(0,40))allItems.push({text:t,intent:intent+'_風格'});
     }
-    sourceRecords.push({url:pg.url,title:pg.title,text:pg.text,controls:pg.controls,fetchedAt:new Date().toISOString(),via:pg.via,pages:1});
+    sourceRecords.push({url:pg.url,title:pg.title,text:pg.text,controls:pg.controls,fetchedAt:new Date().toISOString(),via:pg.via,pages:1,batchId,verified:false});
   }
   const totalChars=pages.reduce((n,p)=>n+p.text.length,0);
   const preview=`主頁：${baseTitle}\n意圖：${intent}\n成功讀取：${pages.length} 頁／目標最多 ${maxPages} 頁\n原文總量：約 ${totalChars.toLocaleString()} 字元\n知識片段：${allItems.length} 段\n讀取方式：${[...new Set(pages.map(p=>p.via))].join('、')}\n\n頁面清單：\n`+pages.map((p,i)=>`${i+1}. ${p.title}\n   ${p.url}\n   ${p.text.length.toLocaleString()} 字元｜連結 ${p.links} 個｜選項/控制項 ${p.controls.length} 個`).join('\n')+
@@ -446,6 +449,7 @@ async function deepLearnFromUrl(url, doLearn=true){
   // v11: Never turn arbitrary scraped fragments into question-answer pairs.
   // Raw chunks remain searchable, but only explicitly reviewed pairs are treated as Q&A.
 
+  cur.lastLearnBatch=batchId;
   const saved=save();rebuild();learned+=res.a;
   $('progBar').style.width='100%';st(saved?'學習完成':'儲存失敗',saved?'ok':'');
   meta();pMeta();showSourceResults('');
@@ -515,9 +519,12 @@ async function send(){
   const qnorm=text.toLowerCase();
   const isSummary=/(學到什麼|學了什麼|學習成果|學習報告|總結|摘要|整理重點|讀了什麼)/.test(text);
   const isVague=/(回答什麼|你會什麼|說說看|怎麼樣\s*[?？]?)/.test(text);
-  const sources=(cur.sources||[]).filter(x=>x&&x.text);
+  const allSources=(cur.sources||[]).filter(x=>x&&x.text);
+  const currentBatch=cur.lastLearnBatch;
+  const currentSources=currentBatch?allSources.filter(x=>x.batchId===currentBatch):[];
+  const sources=currentSources.length?currentSources:allSources;
   if(isSummary){
-    const latest=[...sources].sort((a,b)=>String(b.fetchedAt||'').localeCompare(String(a.fetchedAt||''))).slice(0,5);
+    const latest=[...(currentSources.length?currentSources:allSources.slice(-1))].sort((a,b)=>String(b.fetchedAt||'').localeCompare(String(a.fetchedAt||''))).slice(0,5);
     if(latest.length){
       const report=latest.map((src,i)=>{
         const lines=chunkText(src.text,240).filter(x=>x.length>25&&!/^https?:\/\//i.test(x));
@@ -529,14 +536,15 @@ async function send(){
         }
         return `${i+1}. ${src.title||'未命名來源'}\n網址：${src.url}\n可辨識的內容摘錄：\n${picks.map(x=>'• '+x).join('\n')||'未擷取到足夠正文'}`;
       }).join('\n\n');
-      r={reply:`我目前保存了 ${latest.length} 篇來源。以下是依照已保存原文整理的初步學習報告（不是完整理解保證）：\n\n${report}\n\n限制：這是原文摘錄整理，尚未經語言模型獨立驗證；如果內容不是你預期的文章，請檢查來源標題與網址。`,intent:'學習報告',conf:.7,low:false};
+      r={reply:`這次學習批次有 ${latest.length} 篇來源。以下是依照本次已保存原文整理的初步學習報告（不是完整理解保證）：\n\n${report}\n\n限制：這是原文摘錄整理，尚未經語言模型獨立驗證；如果內容不是你預期的文章，請檢查來源標題與網址。`,intent:'學習報告',conf:.7,low:false};
     } else r={reply:'我目前找不到已保存的網頁來源，所以無法可靠地總結學習成果。請先讀取一篇網址，再回來問我。',intent:'學習報告',conf:.0,low:true};
   } else if(isVague){
     r={reply:'我需要知道你希望我回答哪一個問題。你可以問：「這篇文章的三個重點是什麼？」或「請解釋其中的某個概念」。如果你是在問我剛剛學到什麼，請直接說「整理學習報告」。',intent:'澄清問題',conf:.9,low:false};
   } else if(sources.length){
     // Rank evidence by meaningful query terms; never select a source merely because a generic word matches.
     const stop=new Set(['請','幫我','說明','解釋','什麼','如何','怎麼','為什麼','這個','那個','內容','來源','根據','回答','告訴','一下','可以','是否','請問','整理','以及','並且','的','了','是','有','和','與','在','中','a','an','the','is','are','what','how','why','please','explain','tell','about']);
-    const terms=[...new Set((text.toLowerCase().match(/[\u4e00-\u9fff]|[a-z0-9_+#.-]+/g)||[]).filter(t=>!stop.has(t)&&t.length>1))];
+    const rawTerms=text.toLowerCase().match(/[a-z][a-z0-9_+#.-]{1,}|[\u4e00-\u9fff]{2,}/g)||[];
+    const terms=[...new Set(rawTerms.flatMap(t=>{if(/^[\u4e00-\u9fff]+$/.test(t)){const a=[];for(let i=0;i<t.length-1;i++)a.push(t.slice(i,i+2));if(t.length<=4)a.push(t);return a}return [t]}).filter(t=>!stop.has(t)&&t.length>1))];
     const ranked=sources.map(src=>{
       const title=(src.title||'').toLowerCase(), body=(src.text||'').toLowerCase();
       let score=0, hits=0;
@@ -544,11 +552,12 @@ async function send(){
       return {src,score,hits};
     }).sort((x,y)=>y.score-x.score);
     const best=ranked[0];
-    if(best&&best.score>=2&&best.hits>=1){
+    const requiredHits=terms.length<=1?1:2;
+    if(best&&best.score>=3&&best.hits>=requiredHits){
       const chunks=chunkText(best.src.text,280);
       const excerpts=chunks.map(chunk=>({chunk,score:terms.reduce((n,t)=>n+(chunk.toLowerCase().includes(t)?1:0),0)})).filter(x=>x.score>0).sort((x,y)=>y.score-x.score).slice(0,4);
       if(excerpts.length){
-        r={reply:`根據已保存來源「${best.src.title||'未命名來源'}」，我找到以下相關原文摘錄：\n\n${excerpts.map((x,i)=>`${i+1}. ${x.chunk}`).join('\n\n')}\n\n來源：${best.src.url}\n\n注意：這是依關鍵詞檢索出的證據，不等於我已完整理解或驗證該主張。`,intent:'來源檢索',conf:Math.min(.85,.35+best.score*.05),low:false};
+        r={reply:`根據已保存來源「${best.src.title||'未命名來源'}」，我找到以下相關原文摘錄：\n\n${excerpts.map((x,i)=>`${i+1}. ${x.chunk}`).join('\n\n')}\n\n來源：${best.src.url}\n\n說明：目前這個版本沒有接入真正的語言模型；以上是從單一來源找出的原文摘錄，不是我已經推理完成的完整答案。若摘錄沒有直接回答問題，我應該明確承認不足。`,intent:'來源檢索',conf:Math.min(.85,.35+best.score*.05),low:false};
       }
     } else {
       r={reply:'我在已保存的來源中，沒有找到足夠直接回答這個問題的內容。為避免亂答，請提供更具體的關鍵詞，或讓我學習相關頁面。',intent:'證據不足',conf:.15,low:true};
@@ -598,8 +607,8 @@ $('resetBtn').onclick=()=>{if(confirm('清空此人格？')){cur.data={};cur.pai
   if(!bank.length&&!pairs.length){
     addItems([{text:'你好',intent:'greeting'},{text:'我可以學習任何你給的網址',intent:'default'},{text:'把新聞或文章網址貼給我，我會去瀏覽並吸收',intent:'default'}]);
     save();rebuild();
-    sys('我是鈕釦 AI v11.0 網頁深讀版。可保存問答、整理網頁文字及管理本機記憶；目前尚未接入真正的通用語言模型，因此不能宣稱已精通程式設計。請先匯出備份，再開始累積重要資料。');
-  }else sys(`鈕釦 AI v11.0 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本新增多頁讀取、頁面連結/選項擷取、原文來源庫與關鍵字搜尋；仍受瀏覽器代理、網站登入與動態內容限制。重要記憶請定期匯出備份。`);
+    sys('我是鈕釦 AI v12.0 來源隔離版。已加強本次學習批次與舊來源的隔離，並降低通用詞造成的無關檢索。我仍未接入真正的通用語言模型；目前能保存、檢索與整理原文摘錄，但不會假稱已具備完整推理能力。');
+  }else sys(`鈕釦 AI v12.0 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本新增多頁讀取、頁面連結/選項擷取、原文來源庫與關鍵字搜尋；仍受瀏覽器代理、網站登入與動態內容限制。重要記憶請定期匯出備份。`);
   meta();pMeta();st('就緒','ok');
 })();
 </script>
