@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>鈕釦 AI v18.0 · 網頁學習與回答品質進化版</title>
+<title>鈕釦 AI v19.0 · 網頁學習與回答品質進化版</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--bg:#0b0f14;--card:#141b22;--card2:#1b242e;--card3:#222c38;--line:#253240;--ink:#dfe8f1;--muted:#7d8fa3;--gold:#d4a854;--accent:#5b8fc7;--ok:#6ec89a;--bad:#e07a7a;--warn:#e0b07a}
@@ -70,7 +70,7 @@ footer{padding:10px 12px;background:var(--card);border-top:1px solid var(--line)
 </head>
 <body>
 <header>
-  <h1>鈕釦 AI v18.0</h1>
+  <h1>鈕釦 AI v19.0</h1>
   <select id="personaSelect"></select>
   <span class="arch" id="bankInfo">v13.0</span>
   <span class="status" id="status">載入中</span>
@@ -637,6 +637,8 @@ async function send(){
       r={reply:'我在已保存的來源中，沒有找到足夠直接回答這個問題的內容。為避免亂答，請提供更具體的關鍵詞，或讓我學習相關頁面。',intent:'證據不足',conf:.1,low:true};
     }
   }
+  // Normalize escaped newline sequences returned by some readers/storage paths before rendering.
+  if (typeof r.reply === 'string') r.reply = r.reply.replace(/\\n/g, '\n');
   const m=r.intent?`[${r.intent} · ${(r.conf*100).toFixed(0)}%]`:'';
   addMsg('ai',r.reply,m,{intent:r.intent,text:r.reply});
   hist.push({role:'ai',content:r.reply,meta:m});saveH();
@@ -681,8 +683,8 @@ $('resetBtn').onclick=()=>{if(confirm('清空此人格？')){cur.data={};cur.pai
   if(!bank.length&&!pairs.length){
     addItems([{text:'你好',intent:'greeting'},{text:'我可以學習任何你給的網址',intent:'default'},{text:'把新聞或文章網址貼給我，我會去瀏覽並吸收',intent:'default'}]);
     save();rebuild();
-    sys('我是鈕釦 AI v18.0 嚴謹檢索版。已加強本次學習批次與舊來源的隔離，並降低通用詞造成的無關檢索。我仍未接入真正的通用語言模型；目前能保存、檢索與整理原文摘錄；v13 會避免隨機輸出記憶片段，並將內建基礎知識與本次來源分開標示。仍未具備完整通用推理能力。');
-  }else sys(`鈕釦 AI v18.0 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本新增嚴格檢索門檻、避免隨機拼答、區分內建基礎知識與來源摘錄；多頁讀取仍受瀏覽器代理、網站登入與動態內容限制。重要記憶請定期匯出備份。`);
+    sys('我是鈕釦 AI v19.0 嚴謹檢索版。已加強本次學習批次與舊來源的隔離，並降低通用詞造成的無關檢索。我仍未接入真正的通用語言模型；目前能保存、檢索與整理原文摘錄；v13 會避免隨機輸出記憶片段，並將內建基礎知識與本次來源分開標示。仍未具備完整通用推理能力。');
+  }else sys(`鈕釦 AI v19.0 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本新增嚴格檢索門檻、避免隨機拼答、區分內建基礎知識與來源摘錄；多頁讀取仍受瀏覽器代理、網站登入與動態內容限制。重要記憶請定期匯出備份。`);
   meta();pMeta();st('就緒','ok');
 })();
 </script>
