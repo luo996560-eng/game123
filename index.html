@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>鈕釦 AI v21.0 · 正文知識點提取與來源核驗版</title>
+<title>鈕釦 AI v22.0 · 正文知識點提取與來源核驗版</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--bg:#0b0f14;--card:#141b22;--card2:#1b242e;--card3:#222c38;--line:#253240;--ink:#dfe8f1;--muted:#7d8fa3;--gold:#d4a854;--accent:#5b8fc7;--ok:#6ec89a;--bad:#e07a7a;--warn:#e0b07a}
@@ -70,7 +70,7 @@ footer{padding:10px 12px;background:var(--card);border-top:1px solid var(--line)
 </head>
 <body>
 <header>
-  <h1>鈕釦 AI v21.0</h1>
+  <h1>鈕釦 AI v22.0</h1>
   <select id="personaSelect"></select>
   <span class="arch" id="bankInfo">v13.0</span>
   <span class="status" id="status">載入中</span>
@@ -265,7 +265,40 @@ function addPair(q,a){if(!q||!a)return false;if(!cur.pairs)cur.pairs=[];if(cur.p
 
 function retP(q,k=5){const qv=vec(q);const sc=[];for(let i=0;i<pairs.length;i++){const s=dot(qv,pairs[i].qv);if(s>0)sc.push({i,score:s})}sc.sort((a,b)=>b.score-a.score);return sc.slice(0,k).map(s=>({...pairs[s.i],score:s.score}))}
 function ret(q,k=TOPK,ctx){const qv=vec(q);let fv=qv;if(ctx&&$('contextAware').checked){const cv=vec(ctx);fv=qv.map((x,i)=>x*(1-CTX)+cv[i]*CTX);let n=0;for(const x of fv)n+=x*x;n=Math.sqrt(n)||1;fv=fv.map(x=>x/n)}const ts=new Set(tok(q+(ctx||'')));const cand=new Set();for(const t of ts){const s=inv.get(t);if(s)for(const i of s)cand.add(i)}const pool=cand.size>=8?[...cand]:bank.map((_,i)=>i);const sc=[];for(const i of pool){let s=dot(fv,bank[i].v);const fb=(cur.feedback||{})[bank[i].intent+'|'+bank[i].text];if(fb){s+=(fb.up||0)*.04;s-=(fb.down||0)*.06}if(s>0)sc.push({i,score:s})}sc.sort((a,b)=>b.score-a.score);return sc.slice(0,k).map(s=>({...bank[s.i],score:s.score}))}
+function searchSourceKnowledge(q, limit=5){
+  const query=String(q||'').toLowerCase();
+  const terms=[...new Set(tok(query).filter(x=>x.length>=2))];
+  const rows=Array.isArray(cur.knowledge)?cur.knowledge:[];
+  const scored=[];
+  for(const k of rows){
+    const text=String(k.text||'').trim(); if(!text)continue;
+    const hay=(String(k.title||'')+' '+String(k.url||'')+' '+text).toLowerCase();
+    let score=0;
+    for(const term of terms) if(hay.includes(term)) score+=term.length>=4?1.2:.6;
+    if(/用途|意思|核心|說明|內容|學到|知識|原文|根據|網頁/.test(query)) score+=/(use|purpose|documentation|example|permission|domain|用途|說明|示例|文件|允許)/i.test(text)?1.5:0;
+    if(score>0)scored.push({k,text,score});
+  }
+  return scored.sort((a,b)=>b.score-a.score).slice(0,limit);
+}
+function sourceGroundedAnswer(q){
+  const hits=searchSourceKnowledge(q,5);
+  if(!hits.length)return null;
+  const best=hits[0].score;
+  if(best<1.2)return null;
+  const seen=new Set(), picked=[];
+  for(const h of hits){
+    const key=h.text.toLowerCase();
+    if(seen.has(key))continue;seen.add(key);picked.push(h);
+  }
+  const lines=picked.slice(0,3).map((h,i)=>`${i+1}. ${h.text}\n來源：${h.k.title||'未命名頁面'}\n網址：${h.k.url}`);
+  return {reply:'以下是從已保存網頁原文中檢索到的相關內容（原文摘錄，不代表已完整理解整個網站）：\n\n'+lines.join('\n\n')+'\n\n判讀限制：以上內容可支持對摘錄本身的描述；若問題需要原文未提供的資訊，我不能僅憑這些摘錄確定答案。',intent:'來源原文檢索',conf:Math.min(.9,.45+best*.06),low:false};
+}
 function ans(q,ctx){
+  // v22: Prefer source-linked knowledge records for questions about learned pages.
+  if(/學到|學習|來源|原文|網頁|用途|核心意思|根據.*(網頁|來源)|保存.*知識/.test(String(q||''))){
+    const grounded=sourceGroundedAnswer(q);
+    if(grounded)return grounded;
+  }
   // v13: never randomly emit a retrieved sentence as if it were a complete answer.
   if($('pairPriority').checked&&pairs.length){
     const ph=retP(q);
@@ -505,6 +538,23 @@ async function deepLearnFromUrl(url, doLearn=true){
     `\n\n原文摘錄：\n${pages[0].text.slice(0,1800)}`;
   $('learnResult').style.display='block';$('learnResult').textContent=preview;
   if(!doLearn){$('progBar').style.width='100%';st('預覽完成','ok');setTimeout(()=>$('progress').style.display='none',400);return{title:baseTitle,intent,pages,totalChars,failed}}
+  // v22: Keep source-linked knowledge separate from legacy intent/QA records.
+  if(!Array.isArray(cur.knowledge))cur.knowledge=[];
+  let knowledgeAdded=0, knowledgeDup=0;
+  for(const pg of pages){
+    const sentences=extractKnowledgeSentences(pg.text);
+    const controls=(pg.controls||[]).map(x=>'網頁控制項：'+String(x).trim()).filter(x=>x.length>14&&x.length<420);
+    const candidates=[...sentences,...controls];
+    for(const text of candidates){
+      const key=String(text).toLowerCase().replace(/\s+/g,' ').trim();
+      const exists=cur.knowledge.some(k=>String(k.text||'').toLowerCase().replace(/\s+/g,' ').trim()===key && k.url===pg.url);
+      if(exists){knowledgeDup++;continue;}
+      cur.knowledge.push({text:String(text).trim(),url:pg.url,title:pg.title||pg.url,batchId,via:pg.via,createdAt:new Date().toISOString(),kind:text.startsWith('網頁控制項：')?'control':'text'});
+      knowledgeAdded++;
+    }
+  }
+  // Bound local source-linked knowledge storage.
+  if(cur.knowledge.length>5000)cur.knowledge=cur.knowledge.slice(-5000);
   const res=addItems(allItems);
   if(!cur.sources)cur.sources=[];
   for(const rec of sourceRecords){
@@ -520,10 +570,10 @@ async function deepLearnFromUrl(url, doLearn=true){
   const saved=save();rebuild();learned+=res.a;
   $('progBar').style.width='100%';st(saved?'學習完成':'儲存失敗',saved?'ok':'');
   meta();pMeta();showSourceResults('');
-  sys(`網址學習完成：${pages.length} 頁，原文約 ${totalChars.toLocaleString()} 字元，新增知識片段 ${res.a} 段（重複 ${res.s} 段）。原文已保存到來源資料庫；讀取失敗 ${failed.length} 項。`);
-  ok(saved?`讀取 ${pages.length} 頁並整理 ${res.a} 段知識。請查看頁面清單和來源資料庫。`:'知識已整理，但本機儲存失敗，請立即匯出或減少來源數量。');
+  sys(`網址學習完成：${pages.length} 頁，原文約 ${totalChars.toLocaleString()} 字元，新增來源知識 ${knowledgeAdded} 段（來源知識重複 ${knowledgeDup} 段）；新增舊式索引項目 ${res.a} 段（重複 ${res.s} 段）。原文已保存到來源資料庫；讀取失敗 ${failed.length} 項。`);
+  ok(saved?`讀取 ${pages.length} 頁；來源知識新增 ${knowledgeAdded} 段，舊式索引新增 ${res.a} 段。請查看來源資料庫。`:'知識已整理，但本機儲存失敗，請立即匯出或減少來源數量。');
   setTimeout(()=>$('progress').style.display='none',600);
-  return {title:baseTitle,intent,pages,totalChars,added:res.a,failed};
+  return {title:baseTitle,intent,pages,totalChars,added:res.a,knowledgeAdded,knowledgeDup,failed};
 }
 
 function st(t,ty){const s=$('status');s.textContent=t;s.className='status'+(ty==='ok'?' ok':ty==='busy'?' busy':'')}
@@ -706,8 +756,8 @@ $('resetBtn').onclick=()=>{if(confirm('清空此人格？')){cur.data={};cur.pai
   if(!bank.length&&!pairs.length){
     addItems([{text:'你好',intent:'greeting'},{text:'我可以學習任何你給的網址',intent:'default'},{text:'把新聞或文章網址貼給我，我會去瀏覽並吸收',intent:'default'}]);
     save();rebuild();
-    sys('我是鈕釦 AI v21.0 嚴謹檢索版。已加強本次學習批次與舊來源的隔離，並降低通用詞造成的無關檢索。我仍未接入真正的通用語言模型；目前能保存、檢索與整理原文摘錄；v13 會避免隨機輸出記憶片段，並將內建基礎知識與本次來源分開標示。仍未具備完整通用推理能力。');
-  }else sys(`鈕釦 AI v21.0 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本新增嚴格檢索門檻、避免隨機拼答、區分內建基礎知識與來源摘錄；多頁讀取仍受瀏覽器代理、網站登入與動態內容限制。重要記憶請定期匯出備份。`);
+    sys('我是鈕釦 AI v22.0 嚴謹檢索版。已加強本次學習批次與舊來源的隔離，並降低通用詞造成的無關檢索。我仍未接入真正的通用語言模型；目前能保存、檢索與整理原文摘錄；v13 會避免隨機輸出記憶片段，並將內建基礎知識與本次來源分開標示。仍未具備完整通用推理能力。');
+  }else sys(`鈕釦 AI v22.0 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本新增嚴格檢索門檻、避免隨機拼答、區分內建基礎知識與來源摘錄；多頁讀取仍受瀏覽器代理、網站登入與動態內容限制。重要記憶請定期匯出備份。`);
   meta();pMeta();st('就緒','ok');
 })();
 </script>
