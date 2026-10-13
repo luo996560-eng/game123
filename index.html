@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>鈕釦 AI v13.0 · 嚴謹檢索與回答品質修正版</title>
+<title>鈕釦 AI v14.0 · 網頁學習與回答品質進化版</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--bg:#0b0f14;--card:#141b22;--card2:#1b242e;--card3:#222c38;--line:#253240;--ink:#dfe8f1;--muted:#7d8fa3;--gold:#d4a854;--accent:#5b8fc7;--ok:#6ec89a;--bad:#e07a7a;--warn:#e0b07a}
@@ -70,7 +70,7 @@ footer{padding:10px 12px;background:var(--card);border-top:1px solid var(--line)
 </head>
 <body>
 <header>
-  <h1>鈕釦 AI v13.0</h1>
+  <h1>鈕釦 AI v14.0</h1>
   <select id="personaSelect"></select>
   <span class="arch" id="bankInfo">v13.0</span>
   <span class="status" id="status">載入中</span>
@@ -364,6 +364,45 @@ function chunkText(text, max=220){
   }
   return out;
 }
+
+function linkPriority(href, baseUrl, rootUrl){
+  try{
+    const u=new URL(href,baseUrl), root=new URL(rootUrl);
+    const path=u.pathname.toLowerCase();
+    let score=0;
+    // Prefer pages in the same documentation/tutorial branch as the requested URL.
+    const rootParts=root.pathname.split('/').filter(Boolean);
+    const parts=u.pathname.split('/').filter(Boolean);
+    let common=0;while(common<rootParts.length&&common<parts.length&&rootParts[common]===parts[common])common++;
+    score+=common*4;
+    if(/\/tutorial(\/|$)/.test(path))score+=18;
+    if(/\/howto(\/|$)|\/guide(\/|$)|\/getting-started(\/|$)/.test(path))score+=8;
+    if(/\/reference(\/|$)|\/library\/index|\/extending(\/|$)|\/c-api(\/|$)|\/faq(\/|$)/.test(path))score-=12;
+    if(/\/index\.html?$/.test(path))score-=3;
+    if(/[?&](utm_|session|lang=)/i.test(u.search))score-=8;
+    if(u.hostname!==root.hostname)score-=100;
+    if(u.pathname===root.pathname)score-=100;
+    return score;
+  }catch(e){return -999}
+}
+function cleanKnowledgeLine(line){
+  let x=String(line||'').replace(/\s+/g,' ').trim();
+  if(x.length<35)return '';
+  if(/^(?:og:|description:|keywords:|結構化資料：|<script|<\/|https?:\/\/)/i.test(x))return '';
+  if(/^(?:skip to (?:content|main)|navigation menu|table of contents|previous topic|next topic|view page source|report an issue|edit on github|contents|索引|上一頁|下一頁|回到頂部)$/i.test(x))return '';
+  if(/^\{["'](?:@context|@type|name|url|description)["']\s*:/.test(x))return '';
+  return x;
+}
+function scoreContentLine(line){
+  const x=cleanKnowledgeLine(line);if(!x)return -10;
+  let score=Math.min(5,x.length/100);
+  if(/[。！？.!?；;：:]/.test(x))score+=1;
+  if(/^(?:第?\d+[.)、]|[-*•]|[A-Z][A-Za-z ]{2,}:)/.test(x))score-=.5;
+  if(/cookie|privacy policy|terms of use|sign in|log in|subscribe|copyright|©\s*\d{4}|all rights reserved/i.test(x))score-=3;
+  if(/python documentation|python tutorial|language reference|standard library|navigation|table of contents/i.test(x))score-=1.5;
+  return score;
+}
+
 function crawlLinks(page, base, host){
   return page.links.map(x=>normalizeUrl(x,base)).filter(Boolean).filter(x=>{
     try{const u=new URL(x);return u.hostname===host&&!/\.(?:jpg|jpeg|png|gif|webp|svg|pdf|zip|mp4|mp3|css|js|ico)(?:$|\?)/i.test(u.pathname)}
@@ -413,7 +452,7 @@ async function deepLearnFromUrl(url, doLearn=true){
     if(!page.text||page.text.trim().length<30){failed.push(target+'：讀到的正文太少');continue}
     pages.push({url:target,title:page.title||target,text:page.text.slice(0,45000),controls:page.controls||[],via:fetched.via,links:page.links.length});
     if(pages.length<maxPages&&$('crawlScope').value==='same'){
-      for(const link of crawlLinks(page,target,rootHost)){if(!seen.has(link)&&!queue.includes(link)&&queue.length<80)queue.push(link)}
+      const prioritized=crawlLinks(page,target,rootHost).map(link=>({link,score:linkPriority(link,target,first)})).sort((a,b)=>b.score-a.score);for(const item of prioritized){const link=item.link;if(item.score>-20&&!seen.has(link)&&!queue.includes(link)&&queue.length<80)queue.push(link)}
     }
   }
   if(!pages.length){
@@ -529,18 +568,22 @@ async function send(){
   const currentSources=currentBatch?allSources.filter(x=>x.batchId===currentBatch):[];
   const sources=currentSources;
   const asksReturnPrint=/(return.{0,30}print|print.{0,30}return)/i.test(text) || (text.includes('return')&&text.includes('print')&&/(不同|差別|比較|difference|vs\.?)/i.test(text));
-  if(asksReturnPrint){
+  const asksCodingCapability=/(幫我|幫你|能不能|可以).{0,12}(寫|製作|修改|除錯|修復).{0,12}(遊戲|程式|程式碼|網頁|app|專案)/i.test(text) || /(你會不會|你能否).{0,15}(寫程式|寫遊戲|除錯|修改程式)/i.test(text);
+  if(asksCodingCapability){
+    r={reply:'我可以協助規劃、撰寫和修改程式碼，也能根據你提供的錯誤訊息分析問題。不過，這個版本尚未連接真正的語言模型，也沒有內建可靠的程式執行沙箱，因此不能誠實宣稱能獨立完成任意專案或已經測試通過。\n\n目前可做：\n• 根據明確需求產生程式碼草稿。\n• 搜尋已保存來源，引用找到的技術文件。\n• 依你提供的測試結果修正程式。\n\n尚需升級：語言模型推理、檔案級專案分析、程式執行與自動化測試。',intent:'能力說明',conf:.95,low:false};
+  } else if(asksReturnPrint){
     r={reply:'基本程式知識（不是這次網頁學習的證據）：\n\n• `print(...)`：把資訊輸出到終端機或標準輸出，主要用來顯示內容。\n• `return`：在函式內把值交還給呼叫端；執行 `return` 時，該次函式執行會結束。\n• 例子：`def add(a, b): return a + b` 會回傳加總結果；`print(add(2, 3))` 才會把結果顯示出來。\n\n來源狀態：這是內建基礎知識說明，不代表我已在剛才讀取的網頁中找到這個答案。若你要求只根據來源回答，請以來源中實際包含的內容為準。',intent:'內建基礎知識',conf:.7,low:false};
   } else if(isSummary){
     const latest=[...currentSources].sort((a,b)=>String(b.fetchedAt||'').localeCompare(String(a.fetchedAt||''))).slice(0,5);
     if(latest.length){
       const report=latest.map((src,i)=>{
-        const lines=chunkText(src.text,240).filter(x=>x.length>25&&!/^https?:\/\//i.test(x));
+        const lines=chunkText(src.text,240).map(line=>({line:cleanKnowledgeLine(line),score:scoreContentLine(line)})).filter(x=>x.line&&x.score>0.8);
         const picks=[]; const seen=new Set();
-        for(const line of lines){
-          const key=line.toLowerCase().replace(/\s+/g,' ').slice(0,80);
+        for(const item of lines.sort((a,b)=>b.score-a.score)){
+          const line=item.line;
+          const key=line.toLowerCase().replace(/\s+/g,' ').slice(0,100);
           if(!seen.has(key)){seen.add(key);picks.push(line)}
-          if(picks.length>=4)break;
+          if(picks.length>=5)break;
         }
         return `${i+1}. ${src.title||'未命名來源'}\n網址：${src.url}\n可辨識的內容摘錄：\n${picks.map(x=>'• '+x).join('\n')||'未擷取到足夠正文'}`;
       }).join('\n\n');
@@ -619,8 +662,8 @@ $('resetBtn').onclick=()=>{if(confirm('清空此人格？')){cur.data={};cur.pai
   if(!bank.length&&!pairs.length){
     addItems([{text:'你好',intent:'greeting'},{text:'我可以學習任何你給的網址',intent:'default'},{text:'把新聞或文章網址貼給我，我會去瀏覽並吸收',intent:'default'}]);
     save();rebuild();
-    sys('我是鈕釦 AI v13.0 嚴謹檢索版。已加強本次學習批次與舊來源的隔離，並降低通用詞造成的無關檢索。我仍未接入真正的通用語言模型；目前能保存、檢索與整理原文摘錄；v13 會避免隨機輸出記憶片段，並將內建基礎知識與本次來源分開標示。仍未具備完整通用推理能力。');
-  }else sys(`鈕釦 AI v13.0 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本新增嚴格檢索門檻、避免隨機拼答、區分內建基礎知識與來源摘錄；多頁讀取仍受瀏覽器代理、網站登入與動態內容限制。重要記憶請定期匯出備份。`);
+    sys('我是鈕釦 AI v14.0 嚴謹檢索版。已加強本次學習批次與舊來源的隔離，並降低通用詞造成的無關檢索。我仍未接入真正的通用語言模型；目前能保存、檢索與整理原文摘錄；v13 會避免隨機輸出記憶片段，並將內建基礎知識與本次來源分開標示。仍未具備完整通用推理能力。');
+  }else sys(`鈕釦 AI v14.0 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本新增嚴格檢索門檻、避免隨機拼答、區分內建基礎知識與來源摘錄；多頁讀取仍受瀏覽器代理、網站登入與動態內容限制。重要記憶請定期匯出備份。`);
   meta();pMeta();st('就緒','ok');
 })();
 </script>
