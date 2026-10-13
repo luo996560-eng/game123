@@ -561,6 +561,8 @@ async function send(){
   let ctx='';if($('contextAware').checked)ctx=hist.filter(h=>h.role==='user'||h.role==='ai').slice(-5).map(h=>h.content).join(' ');
   let r=ans(text,ctx);
   const qnorm=text.toLowerCase();
+  const isSourceInventory=/(列出|顯示|查找|找出|查看).{0,18}(本次|這次|最新|剛才|保存|學習批次|來源|學習紀錄)|(本次|這次|最新|剛才).{0,18}(批次識別碼|學習批次|所有來源|來源網址|學習紀錄)/.test(text);
+  const isMemoryAudit=/(重新整理|重新開啟|本機保存|已保存的資料|持久記憶|不要重新瀏覽).{0,30}(來源|紀錄|批次|原文|知識|記憶)/.test(text);
   const isSummary=/(學到什麼|學了什麼|學習成果|學習報告|總結|摘要|整理重點|讀了什麼)/.test(text);
   const isVague=/(回答什麼|你會什麼|說說看|怎麼樣\s*[?？]?)/.test(text);
   const allSources=(cur.sources||[]).filter(x=>x&&x.text);
@@ -573,6 +575,18 @@ async function send(){
     r={reply:'我可以協助規劃、撰寫和修改程式碼，也能根據你提供的錯誤訊息分析問題。不過，這個版本尚未連接真正的語言模型，也沒有內建可靠的程式執行沙箱，因此不能誠實宣稱能獨立完成任意專案或已經測試通過。\n\n目前可做：\n• 根據明確需求產生程式碼草稿。\n• 搜尋已保存來源，引用找到的技術文件。\n• 依你提供的測試結果修正程式。\n\n尚需升級：語言模型推理、檔案級專案分析、程式執行與自動化測試。',intent:'能力說明',conf:.95,low:false};
   } else if(asksReturnPrint){
     r={reply:'基本程式知識（不是這次網頁學習的證據）：\n\n• `print(...)`：把資訊輸出到終端機或標準輸出，主要用來顯示內容。\n• `return`：在函式內把值交還給呼叫端；執行 `return` 時，該次函式執行會結束。\n• 例子：`def add(a, b): return a + b` 會回傳加總結果；`print(add(2, 3))` 才會把結果顯示出來。\n\n來源狀態：這是內建基礎知識說明，不代表我已在剛才讀取的網頁中找到這個答案。若你要求只根據來源回答，請以來源中實際包含的內容為準。',intent:'內建基礎知識',conf:.7,low:false};
+  } else if(isSourceInventory || isMemoryAudit){
+    const stored=(cur.sources||[]).filter(x=>x&&x.url&&x.text);
+    const batch=currentBatch ? stored.filter(x=>x.batchId===currentBatch) : [];
+    const list=batch.length ? batch : stored.slice().sort((a,b)=>String(b.fetchedAt||'').localeCompare(String(a.fetchedAt||''))).slice(0,20);
+    if(list.length){
+      const batchStatus=batch.length
+        ? `目前批次識別碼：${currentBatch}\\n符合本次批次的來源：${batch.length} 篇。`
+        : `目前沒有找到能以批次識別碼確認的來源。\\n以下列出本機保存的最近 ${list.length} 篇來源，但不能保證全部屬於同一次學習。`;
+      r={reply:`${batchStatus}\\n\\n${list.map((src,i)=>`${i+1}. ${src.title||'未命名來源'}\\n網址：${src.url}\\n擷取時間：${src.fetchedAt||'未記錄'}\\n擷取方式：${src.via||'未記錄'}\\n保存字元數：${String(src.text||'').length}\\n批次標記：${src.batchId||'缺失'}`).join('\\n\\n')}\\n\\n記憶核驗：這份清單來自目前 persona 的本機來源資料。若批次標記缺失或批次識別碼不匹配，我不會假稱已找回指定批次。`,intent:'來源資料清單',conf:1,low:false};
+    } else {
+      r={reply:'我在目前 persona 的本機來源資料庫中沒有找到可列出的已保存網頁來源。這表示來源可能未成功保存、目前切換到不同 persona，或瀏覽器儲存資料已遺失。我不能聲稱已記住這次學習。請確認學習完成時有顯示「原文已保存」，並在同一個 persona 下測試。',intent:'來源資料核驗',conf:1,low:false};
+    }
   } else if(isSummary){
     const latest=[...currentSources].sort((a,b)=>String(a.url||'').localeCompare(String(b.url||'')));
     if(latest.length){
