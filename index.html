@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0f14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>鈕釦 AI v9.1 · 安全與記憶修正版</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0b0f14;--card:#141b22;--card2:#1b242e;--card3:#222c38;--line:#253240;--ink:#dfe8f1;--muted:#7d8fa3;--gold:#d4a854;--accent:#5b8fc7;--ok:#6ec89a;--bad:#e07a7a;--warn:#e0b07a}
+html,body{background:var(--bg);color:var(--ink);height:100%;font:15px/1.55 -apple-system,"Segoe UI","Noto Sans TC",sans-serif;overscroll-behavior:none}
+body{display:flex;flex-direction:column;overflow:hidden}
+header{padding:12px 14px;background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-shrink:0}
+header h1{font-size:15px;font-weight:600;color:var(--gold)}
+header .arch{font-size:11px;color:var(--muted);font-family:ui-monospace,monospace}
+header .status{font-size:11px;color:var(--muted);margin-left:auto}
+header .status.ok{color:var(--ok)} header .status.busy{color:var(--warn)}
+header select,header button{background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;cursor:pointer}
+header button{color:var(--muted)}
+#panel{background:var(--card);border-bottom:1px solid var(--line);display:none;overflow-y:auto;max-height:75vh;flex-shrink:0}
+#panel.open{display:block}
+.pbody{padding:14px 16px 20px}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tab{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;font-family:inherit}
+.tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tab-content{display:none} .tab-content.active{display:block}
+label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px}
+input[type=text],input[type=url],textarea,select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:11px 12px;font:14px/1.45 inherit;resize:vertical}
+textarea{min-height:80px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.row button{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:10px 16px;font-size:14px;font-family:inherit;cursor:pointer}
+.row button.ghost{background:transparent;border:1px solid var(--line);color:var(--muted)}
+.row button.warn{background:transparent;border:1px solid #4a2020;color:var(--bad)}
+.row button:disabled{opacity:.45}
+.meta{font-size:12px;color:var(--muted);margin-top:10px;font-family:ui-monospace,monospace;line-height:1.6;white-space:pre-wrap}
+.infobox{font-size:13px;color:var(--accent);background:#0e1a24;border:1px solid #1a2f45;border-radius:8px;padding:12px;margin-top:10px;line-height:1.6}
+.warnbox{font-size:12px;color:var(--gold);background:#241d0e;border:1px solid #4a3a1a;border-radius:8px;padding:10px;margin-top:10px;line-height:1.55}
+.errbox,.okbox{font-size:12px;border-radius:8px;padding:10px;margin-top:10px;display:none}
+.errbox{color:var(--bad);background:#241010;border:1px solid #4a1a1a}
+.okbox{color:var(--ok);background:#0e2418;border:1px solid #1a3a2a}
+.toggle-row{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:14px}
+.toggle-row input{width:18px;height:18px;accent-color:var(--accent)}
+#chat{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;-webkit-overflow-scrolling:touch}
+.msg{max-width:90%;padding:11px 14px;border-radius:14px;font-size:15px;white-space:pre-wrap;word-break:break-word;line-height:1.55}
+.msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.msg.ai{align-self:flex-start;background:var(--card2);border:1px solid var(--line);border-bottom-left-radius:4px}
+.msg.sys{align-self:center;color:var(--muted);font-size:13px;font-style:italic;padding:6px 14px;text-align:center;max-width:96%;background:var(--card3);border-radius:20px}
+.msg .tag{display:block;font-size:11px;color:var(--gold);margin-bottom:4px;font-family:ui-monospace,monospace}
+.msg .fb{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+.msg .fb button{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer}
+footer{padding:10px 12px;background:var(--card);border-top:1px solid var(--line);display:flex;gap:8px;flex-shrink:0;align-items:flex-end;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+#input{flex:1;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:12px;padding:12px;font:15px/1.45 inherit;resize:none;max-height:110px;outline:none}
+#input:focus{border-color:var(--accent)}
+#mic{background:var(--card2);border:1px solid var(--line);color:var(--muted);border-radius:12px;padding:0 14px;font-size:18px;height:44px;min-width:48px;cursor:pointer}
+#mic.listening{background:#3a1a1a;border-color:var(--bad);color:var(--bad)}
+#send{background:var(--accent);color:#fff;border:0;border-radius:12px;padding:0 18px;font-size:15px;height:44px;min-width:64px;cursor:pointer}
+.progress{height:4px;background:var(--line);border-radius:2px;margin-top:10px;overflow:hidden;display:none}
+.progress i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+.learn-result{max-height:160px;overflow-y:auto;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:10px;font-size:13px;line-height:1.5}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal-bg.show{display:flex}
+.modal{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;width:100%;max-width:440px;max-height:80vh;overflow-y:auto}
+.modal h3{color:var(--gold);margin-bottom:12px;font-size:16px}
+.list-item{padding:10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;font-size:13px;display:flex;gap:8px;background:var(--bg)}
+.list-item .del{color:var(--bad);border:1px solid #4a2020;background:transparent;border-radius:5px;padding:3px 8px;font-size:12px;cursor:pointer;flex-shrink:0}
+.persona-chip{padding:6px 14px;border-radius:20px;border:1px solid var(--line);font-size:13px;cursor:pointer;background:var(--bg);display:inline-block;margin:3px}
+.persona-chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+</style>
+</head>
+<body>
+<header>
+  <h1>鈕釦 AI</h1>
+  <select id="personaSelect"></select>
+  <span class="arch" id="bankInfo">v9.1</span>
+  <span class="status" id="status">載入中</span>
+  <button id="gear">⚙</button>
+</header>
+
+<div id="panel">
+  <div class="pbody">
+    <div class="tabs">
+      <button class="tab active" data-tab="url">網址學習</button>
+      <button class="tab" data-tab="pair">問答對</button>
+      <button class="tab" data-tab="persona">人格</button>
+      <button class="tab" data-tab="mem">記憶</button>
+      <button class="tab" data-tab="set">設定</button>
+    </div>
+
+    <div class="tab-content active" id="tab-url">
+      <div class="infobox">
+        <b>正確的學習方式</b><br>
+        給我一個網址（新聞、文章、部落格…），我會連上去瀏覽頁面內容，吸收裡面的資訊、用詞與寫作方式，自動變成我的知識與意圖。
+      </div>
+      <label>網址（必填）</label>
+      <input type="url" id="learnUrl" placeholder="https://news.example.com/article/123">
+      <label>意圖名稱（可留空，我會自動取名）</label>
+      <input type="text" id="learnIntent" placeholder="例如：科技新聞、寫作風格、健康知識">
+      <div class="toggle-row"><input type="checkbox" id="autoIntent" checked><span>自動根據頁面標題建立意圖</span></div>
+      <div class="toggle-row"><input type="checkbox" id="learnStyle" checked><span>同時學習用詞與句子結構</span></div>
+      <div class="toggle-row"><input type="checkbox" id="makePairs" checked><span>自動產生問答對</span></div>
+      <div class="row">
+        <button id="learnUrlBtn">開始瀏覽並學習</button>
+        <button id="previewBtn" class="ghost">只預覽不學習</button>
+      </div>
+      <div class="progress" id="progress"><i id="progBar"></i></div>
+      <div id="learnResult" class="learn-result" style="display:none"></div>
+      <div class="meta" id="urlMeta"></div>
+    </div>
+
+    <div class="tab-content" id="tab-pair">
+      <label>問題</label><input type="text" id="pairQ">
+      <label>回答</label><textarea id="pairA" rows="2"></textarea>
+      <div class="row"><button id="addPairBtn">加入問答對</button><button id="managePairBtn" class="ghost">管理</button></div>
+      <div class="meta" id="pairMeta">0 組</div>
+    </div>
+
+    <div class="tab-content" id="tab-persona">
+      <div id="personaList" style="margin-bottom:10px"></div>
+      <label>新建人格</label>
+      <input type="text" id="newPersonaName" placeholder="名稱">
+      <div class="row">
+        <button id="createPersonaBtn">建立</button>
+        <button id="renamePersonaBtn" class="ghost">改名</button>
+        <button id="deletePersonaBtn" class="warn">刪除</button>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-mem">
+      <label>手動加入（意圖|句子）</label>
+      <textarea id="newData"></textarea>
+      <div class="row">
+        <button id="addBtn">加入</button>
+        <button id="statsBtn" class="ghost">統計</button>
+        <button id="exportBtn" class="ghost">匯出</button>
+        <button id="importBtn" class="ghost">匯入</button>
+      </div>
+      <div class="row">
+        <button id="manageBtn" class="ghost">管理</button>
+        <button id="clearChatBtn" class="ghost">清空對話</button>
+        <button id="resetBtn" class="warn">清空此人格</button>
+      </div>
+      <div class="meta" id="meta"></div>
+    </div>
+
+    <div class="tab-content" id="tab-set">
+      <div class="toggle-row"><input type="checkbox" id="autoLearn"><span>低信心問題加入候選記錄（不直接當成正式知識）</span></div>
+      <div class="toggle-row"><input type="checkbox" id="contextAware" checked><span>多輪上下文</span></div>
+      <div class="toggle-row"><input type="checkbox" id="useMarkov" checked><span>組合生成</span></div>
+      <div class="toggle-row"><input type="checkbox" id="autoSpeak"><span>自動朗讀</span></div>
+      <div class="toggle-row"><input type="checkbox" id="pairPriority" checked><span>問答對優先</span></div>
+      <div class="warnbox">安全提醒：網址學習會把網址交給第三方公開代理，請勿輸入含私人資訊的網址。網站內容可能不完整，也不會因為抓取成功就自動成為已驗證事實。重要記憶請定期匯出 JSON 備份；瀏覽器儲存仍可能因清除網站資料或容量限制而遺失。</div>
+    </div>
+
+    <div class="errbox" id="errBox"></div>
+    <div class="okbox" id="okBox"></div>
+  </div>
+</div>
+
+<div id="chat"></div>
+<footer>
+  <button id="mic">🎤</button>
+  <textarea id="input" rows="1" placeholder="直接問我，或貼網址讓我學習..."></textarea>
+  <button id="send">送出</button>
+</footer>
+
+<div class="modal-bg" id="manageModal"><div class="modal"><h3>記憶管理</h3><div id="memList" style="max-height:50vh;overflow-y:auto"></div><div class="row"><button class="ghost" id="closeManage">關閉</button></div></div></div>
+<div class="modal-bg" id="pairModal"><div class="modal"><h3>問答對</h3><div id="pairList" style="max-height:50vh;overflow-y:auto"></div><div class="row"><button class="ghost" id="closePair">關閉</button></div></div></div>
+<div class="modal-bg" id="teachModal"><div class="modal"><h3>教它</h3><p id="teachQuery" style="color:var(--muted);font-size:13px;margin-bottom:8px"></p><label>意圖</label><input type="text" id="teachIntent"><label>回覆</label><textarea id="teachReply" rows="2"></textarea><div class="toggle-row"><input type="checkbox" id="teachAsPair" checked><span>存成問答對</span></div><div class="row"><button id="confirmTeach">確認</button><button class="ghost" id="cancelTeach">取消</button></div></div></div>
+
+<script>
+const HASH=256, TOPK=8, MIN=0.17, PMIN=0.21, CTX=0.2, MP=0.2, LS='pai_v9';
+let root={active:'預設',personas:{}}, cur=null, bank=[], pairs=[], inv=new Map(), mk={bigram:{},trigram:{}};
+let hist=[], lastU='', recog=null, listen=false, learned=0;
+
+const $=id=>document.getElementById(id);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function tok(t){const c=(t||'').toLowerCase().match(/[\u4e00-\u9fff]|[a-z0-9]+/g)||[];const o=[...c];for(let i=0;i<c.length-1;i++)o.push(c[i]+c[i+1]);for(let i=0;i<c.length-2;i++)o.push(c[i]+c[i+1]+c[i+2]);return o}
+function hsh(t,s){let h=5381;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return((h%s)+s)%s}
+function vec(t){const v=new Array(HASH).fill(0);for(const x of tok(t))v[hsh(x,HASH)]++;let n=0;for(const x of v)n+=x*x;n=Math.sqrt(n)||1;return v.map(x=>x/n)}
+function dot(a,b){let s=0;for(let i=0;i<a.length;i++)s+=a[i]*b[i];return s}
+function split(t){if(!t)return[];return t.replace(/\r/g,'').split(/(?<=[。！？.!?])\s*|\n+/).map(s=>s.trim()).filter(s=>s.length>=5&&s.length<=220)}
+function clean(html){
+  return html.replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<style[\s\S]*?<\/style>/gi,' ')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi,' ').replace(/<!--[\s\S]*?-->/g,' ')
+    .replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<')
+    .replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#\d+;/g,' ').replace(/\s+/g,' ').trim();
+}
+function extractTitle(html){
+  const m=html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)||html.match(/property="og:title"[^>]*content="([^"]+)"/i)||html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+  return m?clean(m[1]).slice(0,60):'';
+}
+function extractMain(html){
+  let main=html;
+  const candidates=[
+    /<article[^>]*>([\s\S]*?)<\/article>/i,
+    /<main[^>]*>([\s\S]*?)<\/main>/i,
+    /class="[^"]*(?:article|content|post|entry|story)[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+    /id="[^"]*(?:content|article|main)[^"]*"[^>]*>([\s\S]*?)<\/div>/i
+  ];
+  for(const re of candidates){
+    const m=html.match(re);
+    if(m&&m[1]&&m[1].length>200){main=m[1];break}
+  }
+  return clean(main);
+}
+
+function defP(){return{data:{},pairs:[],feedback:{}}}
+const BACKUP_LS=LS+'_backup_v1';
+function validRoot(o){
+  return !!o && typeof o==='object' && o.personas && typeof o.personas==='object'
+    && Object.values(o.personas).every(p=>p && typeof p==='object'
+      && (!p.data || typeof p.data==='object')
+      && (!p.pairs || Array.isArray(p.pairs)));
+}
+function load(){
+  let restored=false;
+  for(const key of [LS,BACKUP_LS]){
+    try{
+      const raw=localStorage.getItem(key);
+      if(!raw)continue;
+      const o=JSON.parse(raw);
+      if(validRoot(o)){root=o;restored=(key===BACKUP_LS);break;}
+    }catch(e){}
+  }
+  if(!root.personas['預設'])root.personas['預設']=defP();
+  if(!root.personas[root.active])root.active='預設';
+  cur=root.personas[root.active];
+  if(restored) setTimeout(()=>sys('主記憶資料無法讀取，已嘗試從本機備份恢復。請立即使用「匯出」另存備份。'),0);
+}
+function save(){
+  try{
+    const next=JSON.stringify(root);
+    const old=localStorage.getItem(LS);
+    if(old){
+      try{JSON.parse(old);localStorage.setItem(BACKUP_LS,old)}catch(e){}
+    }
+    localStorage.setItem(LS,next);
+    return true;
+  }catch(e){
+    err('本機儲存失敗（可能容量不足或瀏覽器限制）。請立即按「匯出」備份資料；不要清除 Safari 網站資料。');
+    return false;
+  }
+}
+function switchP(n){if(!root.personas[n])return;root.active=n;cur=root.personas[n];save();rebuild();pUI();meta();pMeta();sys('切換到「'+n+'」');st('就緒','ok')}
+function createP(n){n=(n||'').trim();if(!n||root.personas[n]){alert(n?'已存在':'請輸入');return}root.personas[n]=defP();switchP(n);ok('已建立')}
+function pUI(){const s=$('personaSelect');s.innerHTML='';for(const n of Object.keys(root.personas)){const o=document.createElement('option');o.value=n;o.textContent=n;if(n===root.active)o.selected=true;s.appendChild(o)}const l=$('personaList');l.innerHTML='';for(const n of Object.keys(root.personas)){const c=document.createElement('span');c.className='persona-chip'+(n===root.active?' active':'');c.textContent=n;c.onclick=()=>switchP(n);l.appendChild(c)}}
+
+function rebuild(){bank=[];for(const i of Object.keys(cur.data||{}))for(const t of cur.data[i]||[])bank.push({text:t,intent:i,v:vec(t)});pairs=(cur.pairs||[]).map(p=>({q:p.q,a:p.a,qv:vec(p.q)}));buildI();buildM()}
+function buildI(){inv=new Map();for(let i=0;i<bank.length;i++){const ts=new Set(tok(bank[i].text));for(const t of ts){let s=inv.get(t);if(!s){s=new Set();inv.set(t,s)}s.add(i)}}}
+function buildM(){mk={bigram:{},trigram:{}};const all=bank.map(m=>m.text).concat(pairs.map(p=>p.a));for(const tx of all){const c=(tx||'').split('');for(let i=0;i<c.length-1;i++){const k=c[i];if(!mk.bigram[k])mk.bigram[k]=[];mk.bigram[k].push(c[i+1])}for(let i=0;i<c.length-2;i++){const k=c[i]+c[i+1];if(!mk.trigram[k])mk.trigram[k]=[];mk.trigram[k].push(c[i+2])}}}
+function gen(mode,seed,max=36){const m=mode==='trigram'?mk.trigram:mk.bigram;const ks=Object.keys(m);if(!ks.length)return null;let r=seed||ks[Math.floor(Math.random()*ks.length)];for(let i=0;i<max;i++){const k=mode==='trigram'?r.slice(-2):r.slice(-1);const ns=m[k];if(!ns?.length)break;r+=ns[Math.floor(Math.random()*ns.length)];if(/[。！？.!?]$/.test(r)&&r.length>8)break}return r.trim()}
+
+function addItems(items){let a=0,s=0;if(!cur.data)cur.data={};const ex={};for(const i of Object.keys(cur.data))ex[i]=new Set(cur.data[i]||[]);for(const it of items){if(!it.text||!it.intent)continue;if(!ex[it.intent])ex[it.intent]=new Set();if(ex[it.intent].has(it.text)){s++;continue}ex[it.intent].add(it.text);if(!cur.data[it.intent])cur.data[it.intent]=[];cur.data[it.intent].push(it.text);a++}return{a,s}}
+function addPair(q,a){if(!q||!a)return false;if(!cur.pairs)cur.pairs=[];if(cur.pairs.some(p=>p.q===q&&p.a===a))return false;cur.pairs.push({q,a});return true}
+
+function retP(q,k=5){const qv=vec(q);const sc=[];for(let i=0;i<pairs.length;i++){const s=dot(qv,pairs[i].qv);if(s>0)sc.push({i,score:s})}sc.sort((a,b)=>b.score-a.score);return sc.slice(0,k).map(s=>({...pairs[s.i],score:s.score}))}
+function ret(q,k=TOPK,ctx){const qv=vec(q);let fv=qv;if(ctx&&$('contextAware').checked){const cv=vec(ctx);fv=qv.map((x,i)=>x*(1-CTX)+cv[i]*CTX);let n=0;for(const x of fv)n+=x*x;n=Math.sqrt(n)||1;fv=fv.map(x=>x/n)}const ts=new Set(tok(q+(ctx||'')));const cand=new Set();for(const t of ts){const s=inv.get(t);if(s)for(const i of s)cand.add(i)}const pool=cand.size>=8?[...cand]:bank.map((_,i)=>i);const sc=[];for(const i of pool){let s=dot(fv,bank[i].v);const fb=(cur.feedback||{})[bank[i].intent+'|'+bank[i].text];if(fb){s+=(fb.up||0)*.04;s-=(fb.down||0)*.06}if(s>0)sc.push({i,score:s})}sc.sort((a,b)=>b.score-a.score);return sc.slice(0,k).map(s=>({...bank[s.i],score:s.score}))}
+function ans(q,ctx){
+  if($('pairPriority').checked&&pairs.length){const ph=retP(q);if(ph[0]?.score>=PMIN)return{reply:ph[0].a,intent:'問答對',conf:ph[0].score,low:false}}
+  if(!bank.length&&!pairs.length)return{reply:'我還沒有知識。請給我網址讓我學習，或直接教我。',intent:null,conf:0,low:true};
+  const hits=ret(q,TOPK,ctx);
+  if(!hits.length||hits[0].score<MIN){
+    if($('useMarkov').checked&&Object.keys(mk.trigram).length>15){const g=gen('trigram',q.slice(0,2));if(g&&g.length>5)return{reply:g,intent:'組合',conf:.12,low:true}}
+    return{reply:'這個我還不熟。請給我相關網址，我去瀏覽學習。',intent:'default',conf:hits[0]?.score||0,low:true};
+  }
+  if($('useMarkov').checked&&Math.random()<MP&&Object.keys(mk.trigram).length>30){const g=gen('trigram',hits[0].text.slice(0,2));if(g&&g.length>6)return{reply:g,intent:hits[0].intent+'+gen',conf:hits[0].score,low:false}}
+  const votes={};for(const h of hits)votes[h.intent]=(votes[h.intent]||0)+h.score;
+  let best='',bv=-1;for(const k of Object.keys(votes))if(votes[k]>bv){bv=votes[k];best=k}
+  const pool=bank.filter(m=>m.intent===best);
+  let tw=0;const ws=pool.map(m=>{const fb=(cur.feedback||{})[m.intent+'|'+m.text]||{up:0,down:0};const w=Math.max(.1,1+fb.up*.3-fb.down*.5);tw+=w;return w});
+  let r=Math.random()*tw,ch=pool[0];for(let i=0;i<pool.length;i++){r-=ws[i];if(r<=0){ch=pool[i];break}}
+  return{reply:ch.text,intent:best,conf:hits[0].score,low:false};
+}
+
+async function fetchPage(url){
+  let parsed;
+  try{parsed=new URL(url)}catch(e){return null}
+  if(!['http:','https:'].includes(parsed.protocol)||parsed.username||parsed.password)return null;
+  const proxies=[
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(parsed.href)}`,
+    `https://corsproxy.io/?${encodeURIComponent(parsed.href)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(parsed.href)}`
+  ];
+  for(const p of proxies){
+    const c=new AbortController();
+    const t=setTimeout(()=>c.abort(),18000);
+    try{
+      const r=await fetch(p,{signal:c.signal,redirect:'follow'});
+      if(r.ok){const txt=await r.text();if(txt&&txt.length>100)return txt}
+    }catch(e){}finally{clearTimeout(t)}
+  }
+  return null;
+}
+
+async function deepLearnFromUrl(url, doLearn=true){
+  if(!url||!/^https?:\/\//i.test(url)){err('請輸入完整網址（https://...）');return null}
+  $('progress').style.display='block';$('progBar').style.width='10%';
+  st('連線中…','busy');
+  $('learnResult').style.display='none';
+
+  const html=await fetchPage(url);
+  if(!html){err('無法取得頁面內容。可能是網站阻擋或代理限制。');st('失敗');$('progress').style.display='none';return null}
+
+  $('progBar').style.width='45%';
+  const title=extractTitle(html)||'網頁內容';
+  const mainText=extractMain(html);
+  const sents=split(mainText).filter(s=>{
+    const cjk=(s.match(/[\u4e00-\u9fff]/g)||[]).length;
+    return cjk>=3||s.length>=12;
+  });
+
+  $('progBar').style.width='75%';
+
+  let intent=$('learnIntent').value.trim();
+  if(!intent&&$('autoIntent').checked){
+    intent=title.slice(0,20).replace(/[^\u4e00-\u9fffa-zA-Z0-9]/g,'')||'web_'+Date.now().toString(36);
+  }
+  if(!intent)intent='web_learn';
+
+  const preview=`標題：${title}\n意圖：${intent}\n有效句子：${sents.length} 句\n\n前幾句預覽：\n`+sents.slice(0,6).map((s,i)=>(i+1)+'. '+s).join('\n');
+  $('learnResult').style.display='block';
+  $('learnResult').textContent=preview;
+
+  if(!doLearn){
+    $('progBar').style.width='100%';
+    st('預覽完成','ok');
+    setTimeout(()=>$('progress').style.display='none',400);
+    return {title,intent,sents};
+  }
+
+  const items=sents.map(t=>({text:t,intent}));
+  const res=addItems(items);
+
+  if($('learnStyle').checked){
+    const styleSents=sents.filter(s=>s.length>25&&s.length<120).slice(0,15);
+    addItems(styleSents.map(t=>({text:t,intent:intent+'_風格'})));
+  }
+
+  if($('makePairs').checked&&sents.length){
+    if(title)addPair(title, sents.slice(0,2).join(''));
+    for(const s of sents.slice(0,8)){
+      if(s.length>20&&s.length<100)addPair(s.slice(0,12)+'是什麼？',s);
+    }
+  }
+
+  save();rebuild();learned+=res.a;
+  $('progBar').style.width='100%';
+  st('學習完成','ok');
+  meta();pMeta();
+  sys(`已從「${title}」學習完成\n意圖「${intent}」新增 ${res.a} 句（跳過 ${res.s}）\n目前總記憶 ${bank.length} 句`);
+  ok(`成功吸收 ${res.a} 句知識`);
+  setTimeout(()=>$('progress').style.display='none',500);
+  return {title,intent,sents,added:res.a};
+}
+
+function st(t,ty){const s=$('status');s.textContent=t;s.className='status'+(ty==='ok'?' ok':ty==='busy'?' busy':'')}
+function err(m){const e=$('errBox');e.style.display='block';e.textContent=m;setTimeout(()=>e.style.display='none',8e3)}
+function ok(m){const e=$('okBox');e.style.display='block';e.textContent=m;setTimeout(()=>e.style.display='none',4e3)}
+function sys(t){addMsg('sys',t)}
+function speak(t){if(!window.speechSynthesis)return;window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='zh-TW';u.rate=1.05;window.speechSynthesis.speak(u)}
+function addMsg(role,text,meta,opts){
+  const d=document.createElement('div');d.className='msg '+role;
+  if(meta){const t=document.createElement('span');t.className='tag';t.textContent=meta;d.appendChild(t)}
+  d.appendChild(document.createTextNode(text));
+  if(role==='ai'){
+    const fb=document.createElement('div');fb.className='fb';
+    [['👍','up'],['👎','dn'],['教它','te'],['🔊','sp']].forEach(([lab,k])=>{
+      const b=document.createElement('button');b.textContent=lab;
+      if(k==='up')b.onclick=()=>{if(!opts?.intent)return;if(!cur.feedback)cur.feedback={};const key=opts.intent+'|'+opts.text;if(!cur.feedback[key])cur.feedback[key]={up:0,down:0};cur.feedback[key].up++;save();ok('強化')};
+      if(k==='dn')b.onclick=()=>{if(!opts?.intent)return;if(!cur.feedback)cur.feedback={};const key=opts.intent+'|'+opts.text;if(!cur.feedback[key])cur.feedback[key]={up:0,down:0};cur.feedback[key].down++;save();ok('降低')};
+      if(k==='te')b.onclick=()=>{$('teachQuery').textContent='用戶：'+(lastU||'');$('teachModal').classList.add('show')};
+      if(k==='sp')b.onclick=()=>speak(text);
+      fb.appendChild(b);
+    });
+    d.appendChild(fb);
+  }
+  $('chat').appendChild(d);$('chat').scrollTop=$('chat').scrollHeight;
+}
+function saveH(){try{localStorage.setItem(LS+'_h_'+root.active,JSON.stringify(hist.slice(-200)))}catch(e){}}
+function loadH(){try{hist=JSON.parse(localStorage.getItem(LS+'_h_'+root.active)||'[]')}catch(e){hist=[]}}
+function meta(){let b=0;try{b=new Blob([localStorage.getItem(LS)||'']).size}catch(e){}$('bankInfo').textContent=bank.length+'句·'+pairs.length+'對';$('meta').textContent=`人格：${root.active}\n記憶 ${bank.length} 句 · 問答對 ${pairs.length}\n已用 ${(b/1024).toFixed(1)}KB · 累計學習 ${learned} 句`;$('urlMeta').textContent=`目前總記憶 ${bank.length} 句 · 問答對 ${pairs.length}`}
+function pMeta(){$('pairMeta').textContent=`目前 ${pairs.length} 組`}
+
+function initSpeech(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){$('mic').style.opacity=.4;return}recog=new SR();recog.lang='zh-TW';recog.interimResults=true;
+  recog.onstart=()=>{listen=true;$('mic').classList.add('listening');st('聆聽中','busy')};
+  recog.onend=()=>{listen=false;$('mic').classList.remove('listening');st('就緒','ok')};
+  recog.onerror=()=>{listen=false;$('mic').classList.remove('listening');st('就緒','ok')};
+  recog.onresult=e=>{let f='',i='';for(let x=e.resultIndex;x<e.results.length;x++){if(e.results[x].isFinal)f+=e.results[x][0].transcript;else i+=e.results[x][0].transcript}if(f){$('input').value=f;send()}else if(i)$('input').value=i}}
+function toggleMic(){if(!recog){err('請用 Chrome 才能語音');return}if(listen){recog.stop();return}try{recog.start()}catch(e){err('麥克風失敗')}}
+
+async function send(){
+  const text=$('input').value.trim();if(!text)return;
+  $('input').value='';$('input').style.height='auto';
+  addMsg('user',text);hist.push({role:'user',content:text});lastU=text;
+
+  if(/^https?:\/\/\S+$/i.test(text)){
+    sys('偵測到網址，開始瀏覽學習...');
+    $('learnUrl').value=text;
+    await deepLearnFromUrl(text,true);
+    saveH();return;
+  }
+  if(/^學[：:]\s*(https?:\/\/\S+)/i.test(text)){
+    const url=text.match(/https?:\/\/\S+/i)[0];
+    sys('開始學習此網址...');
+    $('learnUrl').value=url;
+    await deepLearnFromUrl(url,true);
+    saveH();return;
+  }
+
+  await sleep(30);
+  let ctx='';if($('contextAware').checked)ctx=hist.filter(h=>h.role==='user'||h.role==='ai').slice(-5).map(h=>h.content).join(' ');
+  const r=ans(text,ctx);
+  const m=r.intent?`[${r.intent} · ${(r.conf*100).toFixed(0)}%]`:'';
+  addMsg('ai',r.reply,m,{intent:r.intent,text:r.reply});
+  hist.push({role:'ai',content:r.reply,meta:m});saveH();
+  if($('autoSpeak').checked)speak(r.reply);
+  if(r.low&&$('autoLearn').checked&&text.length>=2){if(!cur.candidates)cur.candidates=[];if(!cur.candidates.includes(text)){cur.candidates.push(text);cur.candidates=cur.candidates.slice(-200);save();}sys('這個問題已放入待確認候選記錄，沒有直接當成正確知識。請透過「教它」提供經確認的答案。')}
+}
+
+$('send').onclick=send;
+$('input').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}};
+$('input').oninput=()=>{$('input').style.height='auto';$('input').style.height=Math.min($('input').scrollHeight,110)+'px'};
+$('mic').onclick=toggleMic;
+$('gear').onclick=()=>$('panel').classList.toggle('open');
+$('personaSelect').onchange=e=>switchP(e.target.value);
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));t.classList.add('active');$('tab-'+t.dataset.tab).classList.add('active')});
+
+$('learnUrlBtn').onclick=()=>deepLearnFromUrl($('learnUrl').value.trim(),true);
+$('previewBtn').onclick=()=>deepLearnFromUrl($('learnUrl').value.trim(),false);
+
+$('addPairBtn').onclick=()=>{const q=$('pairQ').value.trim(),a=$('pairA').value.trim();if(!q||!a)return;if(addPair(q,a)){save();rebuild();pMeta();meta();$('pairQ').value='';$('pairA').value='';ok('已加入');sys('問答對已加入')}};
+$('addBtn').onclick=()=>{const raw=$('newData').value.trim();if(!raw)return;const items=[];for(const line of raw.split('\n')){const p=line.split('|').map(x=>x.trim()).filter(Boolean);if(p.length<2)continue;for(let i=1;i<p.length;i++)items.push({text:p[i],intent:p[0]})}const res=addItems(items);save();rebuild();meta();$('newData').value='';sys('加入 '+res.a+' 句');ok('完成')};
+$('createPersonaBtn').onclick=()=>createP($('newPersonaName').value);
+$('renamePersonaBtn').onclick=()=>{const n=prompt('新名稱',root.active);if(!n?.trim()||n===root.active)return;if(root.personas[n.trim()]){alert('已存在');return}root.personas[n.trim()]=root.personas[root.active];delete root.personas[root.active];root.active=n.trim();cur=root.personas[root.active];save();pUI();ok('已改名')};
+$('deletePersonaBtn').onclick=()=>{if(Object.keys(root.personas).length<=1){alert('至少留一個');return}if(!confirm('刪除？'))return;delete root.personas[root.active];root.active=Object.keys(root.personas)[0];cur=root.personas[root.active];save();rebuild();pUI();meta();sys('已刪除')};
+$('manageBtn').onclick=()=>{const list=$('memList');list.replaceChildren();let c=0;for(const i of Object.keys(cur.data||{}).sort()){for(const t of cur.data[i]||[]){if(c++>=120)break;const d=document.createElement('div');d.className='list-item';const body=document.createElement('div');body.style.flex='1';const tag=document.createElement('span');tag.style.color='var(--gold)';tag.style.fontSize='11px';tag.textContent='['+i+'] ';body.append(tag,document.createTextNode(t));const b=document.createElement('button');b.className='del';b.textContent='刪';b.onclick=()=>{const idx=(cur.data[i]||[]).indexOf(t);if(idx>=0)cur.data[i].splice(idx,1);if(!cur.data[i]?.length)delete cur.data[i];save();rebuild();meta();$('manageBtn').onclick()};d.append(body,b);list.appendChild(d)}if(c>=120)break}$('manageModal').classList.add('show')};
+$('closeManage').onclick=()=>$('manageModal').classList.remove('show');
+$('managePairBtn').onclick=()=>{const list=$('pairList');list.replaceChildren();(cur.pairs||[]).forEach((p,idx)=>{const d=document.createElement('div');d.className='list-item';const body=document.createElement('div');body.style.flex='1';const q=document.createElement('div');q.style.color='var(--accent)';q.style.fontSize='12px';q.textContent='Q: '+String(p.q||'');const a=document.createElement('div');a.textContent='A: '+String(p.a||'');body.append(q,a);const b=document.createElement('button');b.className='del';b.textContent='刪';b.onclick=()=>{cur.pairs.splice(idx,1);save();rebuild();pMeta();$('managePairBtn').onclick()};d.append(body,b);list.appendChild(d)});$('pairModal').classList.add('show')};
+$('closePair').onclick=()=>$('pairModal').classList.remove('show');
+$('confirmTeach').onclick=()=>{const intent=$('teachIntent').value.trim()||'user_taught';const raw=$('teachReply').value.trim();if(!raw)return;const rs=raw.split('|').map(s=>s.trim()).filter(Boolean);addItems(rs.map(t=>({text:t,intent})));if(lastU)addItems([{text:lastU,intent}]);if($('teachAsPair').checked&&lastU)for(const r of rs)addPair(lastU,r);save();rebuild();meta();pMeta();sys('已學會');ok('完成');$('teachModal').classList.remove('show')};
+$('cancelTeach').onclick=()=>$('teachModal').classList.remove('show');
+$('exportBtn').onclick=()=>{try{const histories={};for(const n of Object.keys(root.personas)){try{histories[n]=JSON.parse(localStorage.getItem(LS+'_h_'+n)||'[]')}catch(e){histories[n]=[]}}const payload={format:'niukou-ai-full-backup',version:3,exportedAt:new Date().toISOString(),root:root,histories:histories};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`Niukou-Full-Backup-${Date.now()}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);ok('完整備份已匯出，包含所有人格、知識、問答對、回饋及可讀取的對話紀錄。請確認檔案已存入「檔案」App。')}catch(e){err('匯出失敗：'+e.message)}};
+$('importBtn').onclick=()=>{const inp=document.createElement('input');inp.type='file';inp.accept='.json,application/json';inp.onchange=()=>{const file=inp.files&&inp.files[0];if(!file)return;if(file.size>5*1024*1024){err('備份檔超過 5 MB，為保護手機暫不匯入。');return}const r=new FileReader();r.onload=()=>{try{const o=JSON.parse(r.result);if(o&&o.format==='niukou-ai-full-backup'&&validRoot(o.root)){if(!confirm('這是完整備份。匯入會取代目前所有人格與知識，建議先匯出目前資料。確定繼續？'))return;root=o.root;if(!root.personas[root.active])root.active=Object.keys(root.personas)[0]||'預設';if(!root.personas[root.active])root.personas['預設']=defP();cur=root.personas[root.active];save();for(const n of Object.keys(root.personas)){const h=Array.isArray(o.histories&&o.histories[n])?o.histories[n].filter(m=>m&&['user','ai','sys'].includes(m.role)&&typeof m.content==='string').slice(-200):[];try{localStorage.setItem(LS+'_h_'+n,JSON.stringify(h))}catch(e){}}rebuild();pUI();loadH();$('chat').replaceChildren();for(const m of hist)addMsg(m.role,m.content,m.meta,{intent:null,text:m.content});meta();pMeta();ok('完整備份還原完成。請再次匯出，確認新備份可正常保存。');return}if(!o||typeof o!=='object'||!o.data||typeof o.data!=='object')throw new Error('檔案格式不正確，找不到知識資料。');const entries=Object.entries(o.data);if(entries.length>5000)throw new Error('分類數量異常，已停止匯入。');const items=[];for(const [i,a] of entries){if(typeof i!=='string'||!Array.isArray(a))continue;for(const t of a){if(typeof t==='string'&&t.length<=5000)items.push({text:t,intent:i.slice(0,120)})}}if(items.length>50000)throw new Error('資料筆數過多，已停止匯入。');const incomingPairs=Array.isArray(o.pairs)?o.pairs.filter(p=>p&&typeof p.q==='string'&&typeof p.a==='string'&&p.q.length<=5000&&p.a.length<=10000).slice(0,20000):[];const res=addItems(items);for(const p of incomingPairs)addPair(p.q,p.a);save();rebuild();meta();pMeta();ok(`舊版備份匯入完成：新增 ${res.a} 句；問答對已合併。請檢查內容及來源。`)}catch(e){err('匯入失敗：'+e.message)}};r.onerror=()=>err('無法讀取備份檔。');r.readAsText(file)};inp.click()};
+$('statsBtn').onclick=()=>{const c={};for(const m of bank)c[m.intent]=(c[m.intent]||0)+1;alert(`人格 ${root.active}\n句子 ${bank.length}\n問答對 ${pairs.length}\n\n`+Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,25).map(e=>e[0]+'：'+e[1]).join('\n'))};
+$('clearChatBtn').onclick=()=>{if(confirm('清空對話？')){hist=[];saveH();$('chat').innerHTML='';sys('對話已清空')}};
+$('resetBtn').onclick=()=>{if(confirm('清空此人格？')){cur.data={};cur.pairs=[];cur.feedback={};save();rebuild();meta();pMeta();sys('已清空')}};
+
+(function(){
+  load();rebuild();pUI();loadH();initSpeech();
+  if(hist.length)for(const m of hist){if(m.role==='ai')addMsg(m.role,m.content,m.meta,{intent:null,text:m.content});else addMsg(m.role,m.content)}
+  if(!bank.length&&!pairs.length){
+    addItems([{text:'你好',intent:'greeting'},{text:'我可以學習任何你給的網址',intent:'default'},{text:'把新聞或文章網址貼給我，我會去瀏覽並吸收',intent:'default'}]);
+    save();rebuild();
+    sys('我是鈕釦 AI v9.1 安全與記憶修正版。可保存問答、整理網頁文字及管理本機記憶；目前尚未接入真正的通用語言模型，因此不能宣稱已精通程式設計。請先匯出備份，再開始累積重要資料。');
+  }else sys(`鈕釦 AI v9.1 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本先改善安全與資料保存；網頁文字擷取不等於真正的模型理解，程式專家模型尚待下一階段整合。重要記憶請定期匯出備份。`);
+  meta();pMeta();st('就緒','ok');
+})();
+</script>
+</body>
+</html>
