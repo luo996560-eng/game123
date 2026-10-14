@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>鈕釦 AI v23.0 · 正文知識點提取與來源核驗版</title>
+<title>鈕釦 AI v24.0 · 來源檢索修正與證據回覆版</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--bg:#0b0f14;--card:#141b22;--card2:#1b242e;--card3:#222c38;--line:#253240;--ink:#dfe8f1;--muted:#7d8fa3;--gold:#d4a854;--accent:#5b8fc7;--ok:#6ec89a;--bad:#e07a7a;--warn:#e0b07a}
@@ -70,7 +70,7 @@ footer{padding:10px 12px;background:var(--card);border-top:1px solid var(--line)
 </head>
 <body>
 <header>
-  <h1>鈕釦 AI v23.0</h1>
+  <h1>鈕釦 AI v24.0</h1>
   <select id="personaSelect"></select>
   <span class="arch" id="bankInfo">v13.0</span>
   <span class="status" id="status">載入中</span>
@@ -155,10 +155,9 @@ footer{padding:10px 12px;background:var(--card);border-top:1px solid var(--line)
     <div class="tab-content" id="tab-set">
       <div class="toggle-row"><input type="checkbox" id="autoLearn"><span>低信心問題加入候選記錄（不直接當成正式知識）</span></div>
       <div class="toggle-row"><input type="checkbox" id="contextAware" checked><span>多輪上下文</span></div>
-      <div class="toggle-row"><input type="checkbox" id="useMarkov" checked><span>組合生成</span></div>
       <div class="toggle-row"><input type="checkbox" id="autoSpeak"><span>自動朗讀</span></div>
       <div class="toggle-row"><input type="checkbox" id="pairPriority" checked><span>問答對優先</span></div>
-      <div class="warnbox">安全與能力邊界：為繞過瀏覽器跨網域限制，可能會將公開網址交給第三方讀取代理；不要輸入私人、內網或帶有登入權杖的網址。網站若要求登入、使用動態腳本、封鎖代理或只提供部分內容，仍可能無法完整讀取。此版會保存抓到的原文與來源，並依關鍵字檢索；它不是大型語言模型，不能只靠抓取就真正理解所有知識或保證答案正確。重要資料請定期匯出備份。</div>
+      <div class="warnbox">安全與能力邊界：為繞過瀏覽器跨網域限制，可能會將公開網址交給第三方讀取代理；不要輸入私人、內網或帶有登入權杖的網址。網站若要求登入、使用動態腳本、封鎖代理或只提供部分內容，仍可能無法完整讀取。此版會保存抓到的原文與來源，並依關鍵字與段落排序檢索；它不是大型語言模型，不能只靠抓取就真正理解所有知識或保證答案正確。重要資料請定期匯出備份。</div>
     </div>
 
     <div class="errbox" id="errBox"></div>
@@ -265,54 +264,65 @@ function addPair(q,a){if(!q||!a)return false;if(!cur.pairs)cur.pairs=[];if(cur.p
 
 function retP(q,k=5){const qv=vec(q);const sc=[];for(let i=0;i<pairs.length;i++){const s=dot(qv,pairs[i].qv);if(s>0)sc.push({i,score:s})}sc.sort((a,b)=>b.score-a.score);return sc.slice(0,k).map(s=>({...pairs[s.i],score:s.score}))}
 function ret(q,k=TOPK,ctx){const qv=vec(q);let fv=qv;if(ctx&&$('contextAware').checked){const cv=vec(ctx);fv=qv.map((x,i)=>x*(1-CTX)+cv[i]*CTX);let n=0;for(const x of fv)n+=x*x;n=Math.sqrt(n)||1;fv=fv.map(x=>x/n)}const ts=new Set(tok(q+(ctx||'')));const cand=new Set();for(const t of ts){const s=inv.get(t);if(s)for(const i of s)cand.add(i)}const pool=cand.size>=8?[...cand]:bank.map((_,i)=>i);const sc=[];for(const i of pool){let s=dot(fv,bank[i].v);const fb=(cur.feedback||{})[bank[i].intent+'|'+bank[i].text];if(fb){s+=(fb.up||0)*.04;s-=(fb.down||0)*.06}if(s>0)sc.push({i,score:s})}sc.sort((a,b)=>b.score-a.score);return sc.slice(0,k).map(s=>({...bank[s.i],score:s.score}))}
-function searchSourceKnowledge(q, limit=5){
-  const query=String(q||'').toLowerCase();
-  const terms=[...new Set(tok(query).filter(x=>x.length>=2))];
-  const rows=[];
-  // Prefer explicit knowledge chunks, but also search the saved source text directly.
+function sourceQueryTerms(q){
+  const raw=String(q||'').toLowerCase().match(/[a-z][a-z0-9_+#.-]*|[\u4e00-\u9fff]+/g)||[];
+  const stop=new Set(['what','which','when','where','who','why','how','does','this','that','page','website','the','and','for','with','from','into','are','is','was','were','can','could','would','should','please','tell','explain','about','用途','目的','這個','網頁','網頁的','什麼','如何','為什麼','請問','請你','幫我','根據','原文','來源','回答','整理','說明','一下','可以','哪些','內容','頁面','網站']);
+  const out=[];
+  for(const t of raw){
+    if(/^[\u4e00-\u9fff]+$/.test(t)){
+      if(t.length===1)out.push(t);
+      else { for(let i=0;i<t.length-1;i++) out.push(t.slice(i,i+2)); if(t.length<=4)out.push(t); }
+    } else if(t.length>=2&&!stop.has(t)) out.push(t);
+  }
+  return [...new Set(out)].filter(t=>!stop.has(t));
+}
+function searchSourceKnowledge(q, limit=8){
+  const terms=sourceQueryTerms(q), rows=[];
   for(const k of (Array.isArray(cur.knowledge)?cur.knowledge:[])) rows.push(k);
   for(const src of (Array.isArray(cur.sources)?cur.sources:[])){
     if(!src||!src.text)continue;
-    const parts=extractKnowledgeSentences(src.text);
-    for(const text of parts) rows.push({text,url:src.url,title:src.title,batchId:src.batchId,via:src.via,kind:'source_sentence'});
+    // Keep paragraph-sized evidence rather than relying on only a short generated knowledge sentence.
+    const paragraphs=String(src.text).split(/\n{1,}|(?<=[。！？.!?])\s+/).map(x=>x.trim()).filter(x=>x.length>=12&&x.length<=1400);
+    for(const text of paragraphs) rows.push({text,url:src.url,title:src.title,batchId:src.batchId,via:src.via,kind:'source_paragraph'});
   }
   const unique=new Map();
-  const purposeIntent=/用途|目的|用來做什麼|核心意思|purpose|what is this page for/i.test(query);
-  const allowedIntent=/允許|用途|目的|使用|可以做什麼|purpose|permission|allowed|documentation examples/i.test(query);
-  const terms2=terms.filter(t=>!['這個','網頁','用途','什麼','哪些','資訊','原文','直接','說明','推論','每一點','附上','證據','網址','根據','回答','please','what','page','website'].includes(t));
   for(const k of rows){
     const text=String(k.text||'').trim(); if(text.length<12)continue;
-    const hay=(String(k.title||'')+' '+String(k.url||'')+' '+text).toLowerCase();
+    const title=String(k.title||'').toLowerCase(), url=String(k.url||'').toLowerCase(), hay=(title+' '+url+' '+text).toLowerCase();
     let score=0, matched=0;
-    for(const term of terms2){if(term.length<2)continue;if(hay.includes(term)){matched++;score+=term.length>=4?1.2:.6}}
-    // Cross-language intent cues for common questions about Example Domain and documentation pages.
-    if(purposeIntent && /domain is for use in documentation examples|documentation examples without needing permission|not a service|avoid relying on it for testing|example domain/i.test(text)) score+=4;
-    if(allowedIntent && /without needing permission|for use in documentation examples|not a service|avoid relying on it for testing/i.test(text)) score+=3;
-    if(/example\.com/i.test(String(k.url||'')) && purposeIntent && /domain|documentation|example|service|testing|permission/i.test(text)) score+=2;
+    for(const term of terms){
+      if(term.length<2)continue;
+      let count=0, at=0; while((at=hay.indexOf(term,at))!==-1&&count<4){count++;at+=term.length;}
+      if(count){matched++;score+=Math.min(count,3)*(term.length>=4?1.25:0.65);if(title.includes(term))score+=1.8;if(url.includes(term))score+=0.4;}
+    }
+    // Questions about a page's purpose often use words absent from the original wording.
+    if(/用途|目的|用來做什麼|purpose|what.{0,12}(page|site|website).{0,12}(for|do)|what is this page/i.test(q)){
+      if(/documentation|examples?|demonstration|testing|permission|service|domain|示範|文件|教學|測試|服務|用途|目的/i.test(text))score+=1.2;
+    }
     if(score>0){
-      const key=(String(k.url||'')+'|'+text.toLowerCase().replace(/\s+/g,' ').trim());
+      const key=(url+'|'+text.toLowerCase().replace(/\s+/g,' ').trim());
       const old=unique.get(key);if(!old||score>old.score)unique.set(key,{k,text,score,matched});
     }
   }
-  return [...unique.values()].sort((a,b)=>b.score-a.score).slice(0,limit);
+  return [...unique.values()].sort((a,b)=>b.score-a.score||b.matched-a.matched).slice(0,limit);
 }
 function sourceGroundedAnswer(q){
-  const hits=searchSourceKnowledge(q,8);
+  const hits=searchSourceKnowledge(q,12);
   if(!hits.length)return null;
   const best=hits[0].score;
-  if(best<1.2)return null;
+  // Require actual query-term overlap; intent hints alone must not invent an answer.
+  if(best<1.35||hits[0].matched<1)return null;
   const seen=new Set(), picked=[];
   for(const h of hits){
     const key=h.text.toLowerCase().replace(/\s+/g,' ').trim();
     if(seen.has(key))continue;seen.add(key);picked.push(h);
+    if(picked.length>=4)break;
   }
-  const lines=picked.slice(0,4).map((h,i)=>`${i+1}. ${h.text}\n來源：${h.k.title||'未命名頁面'}\n網址：${h.k.url||'未記錄網址'}`);
-  const purposeIntent=/用途|目的|用來做什麼|核心意思|purpose|what is this page for/i.test(String(q||''));
-  const answerLead=purposeIntent?'依已保存原文，這個頁面的用途可概括為：提供文件或教學示例使用的示範網域；原文也提醒它不是一項服務，不應依賴它進行測試。以下列出支持這個判斷的原文摘錄。':'以下是從已保存來源中檢索到的相關原文摘錄。';
-  return {reply:answerLead+'\n\n'+lines.join('\n\n')+'\n\n判讀限制：以上結論只依據列出的來源摘錄；未被來源直接支持的細節不作推定。',intent:'來源原文檢索',conf:Math.min(.9,.5+best*.05),low:false};
+  const lines=picked.map((h,i)=>`${i+1}. ${h.text}\n來源：${h.k.title||'未命名頁面'}\n網址：${h.k.url||'未記錄網址'}`);
+  return {reply:'我從已保存的來源中找到以下相關原文。先提供證據，不把推測冒充成原文答案：\n\n'+lines.join('\n\n')+'\n\n判讀方式：請看摘錄是否直接回答你的問題；如果只是相關內容，仍不能算已解答。這個版本使用關鍵詞與段落排序，尚不是大型語言模型的語意推理。',intent:'來源原文檢索',conf:Math.min(.88,.48+best*.045),low:false};
 }
 function ans(q,ctx){
-  // v23: Prefer source-linked knowledge records for questions about learned pages.
+  // v24: Prefer source-linked knowledge records for questions about learned pages.
   if(/學到|學習|來源|原文|網頁|用途|核心意思|根據.*(網頁|來源)|保存.*知識/.test(String(q||''))){
     const grounded=sourceGroundedAnswer(q);
     if(grounded)return grounded;
@@ -662,7 +672,9 @@ async function send(){
   const sources=currentSources;
   const asksReturnPrint=/(return.{0,30}print|print.{0,30}return)/i.test(text) || (text.includes('return')&&text.includes('print')&&/(不同|差別|比較|difference|vs\.?)/i.test(text));
   const asksCodingCapability=/(幫我|幫你|能不能|可以).{0,12}(寫|製作|修改|除錯|修復).{0,12}(遊戲|程式|程式碼|網頁|app|專案)/i.test(text) || /(你會不會|你能否).{0,15}(寫程式|寫遊戲|除錯|修改程式)/i.test(text);
-  if(asksCodingCapability){
+  if(r.intent==='來源原文檢索'){
+    // Keep the improved source-grounded retrieval result; later fallback branches must not overwrite it.
+  } else if(asksCodingCapability){
     r={reply:'我可以協助規劃、撰寫和修改程式碼，也能根據你提供的錯誤訊息分析問題。不過，這個版本尚未連接真正的語言模型，也沒有內建可靠的程式執行沙箱，因此不能誠實宣稱能獨立完成任意專案或已經測試通過。\n\n目前可做：\n• 根據明確需求產生程式碼草稿。\n• 搜尋已保存來源，引用找到的技術文件。\n• 依你提供的測試結果修正程式。\n\n尚需升級：語言模型推理、檔案級專案分析、程式執行與自動化測試。',intent:'能力說明',conf:.95,low:false};
   } else if(asksReturnPrint){
     r={reply:'基本程式知識（不是這次網頁學習的證據）：\n\n• `print(...)`：把資訊輸出到終端機或標準輸出，主要用來顯示內容。\n• `return`：在函式內把值交還給呼叫端；執行 `return` 時，該次函式執行會結束。\n• 例子：`def add(a, b): return a + b` 會回傳加總結果；`print(add(2, 3))` 才會把結果顯示出來。\n\n來源狀態：這是內建基礎知識說明，不代表我已在剛才讀取的網頁中找到這個答案。若你要求只根據來源回答，請以來源中實際包含的內容為準。',intent:'內建基礎知識',conf:.7,low:false};
@@ -774,8 +786,8 @@ $('resetBtn').onclick=()=>{if(confirm('清空此人格？')){cur.data={};cur.pai
   if(!bank.length&&!pairs.length){
     addItems([{text:'你好',intent:'greeting'},{text:'我可以學習任何你給的網址',intent:'default'},{text:'把新聞或文章網址貼給我，我會去瀏覽並吸收',intent:'default'}]);
     save();rebuild();
-    sys('我是鈕釦 AI v23.0 嚴謹檢索版。已加強本次學習批次與舊來源的隔離，並降低通用詞造成的無關檢索。我仍未接入真正的通用語言模型；目前能保存、檢索與整理原文摘錄；v13 會避免隨機輸出記憶片段，並將內建基礎知識與本次來源分開標示。仍未具備完整通用推理能力。');
-  }else sys(`鈕釦 AI v23.0 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本新增嚴格檢索門檻、避免隨機拼答、區分內建基礎知識與來源摘錄；多頁讀取仍受瀏覽器代理、網站登入與動態內容限制。重要記憶請定期匯出備份。`);
+    sys('我是鈕釦 AI v24.0 嚴謹檢索版。已加強本次學習批次與舊來源的隔離，並降低通用詞造成的無關檢索。我仍未接入真正的通用語言模型；目前能保存、檢索與整理原文摘錄；v13 會避免隨機輸出記憶片段，並將內建基礎知識與本次來源分開標示。仍未具備完整通用推理能力。');
+  }else sys(`鈕釦 AI v24.0 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本改善中英文關鍵詞拆分、來源段落檢索與證據摘錄；避免把隨機拼字當成回答，並區分內建基礎知識與來源摘錄；多頁讀取仍受瀏覽器代理、網站登入與動態內容限制。重要記憶請定期匯出備份。`);
   meta();pMeta();st('就緒','ok');
 })();
 </script>
