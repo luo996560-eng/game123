@@ -1,794 +1,995 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0f14">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<title>鈕釦 AI v24.0 · 來源檢索修正與證據回覆版</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#12121a">
+<title>深淵遠征</title>
 <style>
+:root{--bg:#0e0e14;--p:#16161f;--p2:#1c1c28;--ln:#2c2c3c;--tx:#e6e4f0;--mu:#8886a0;--g:#d4b56a;--r:#e07070;--b:#7ab0e0;--gn:#6ecf8a;--pu:#b090e0;--or:#e09060}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-:root{--bg:#0b0f14;--card:#141b22;--card2:#1b242e;--card3:#222c38;--line:#253240;--ink:#dfe8f1;--muted:#7d8fa3;--gold:#d4a854;--accent:#5b8fc7;--ok:#6ec89a;--bad:#e07a7a;--warn:#e0b07a}
-html,body{background:var(--bg);color:var(--ink);height:100%;font:15px/1.55 -apple-system,"Segoe UI","Noto Sans TC",sans-serif;overscroll-behavior:none}
-body{display:flex;flex-direction:column;overflow:hidden}
-header{padding:12px 14px;background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-shrink:0}
-header h1{font-size:15px;font-weight:600;color:var(--gold)}
-header .arch{font-size:11px;color:var(--muted);font-family:ui-monospace,monospace}
-header .status{font-size:11px;color:var(--muted);margin-left:auto}
-header .status.ok{color:var(--ok)} header .status.busy{color:var(--warn)}
-header select,header button{background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;cursor:pointer}
-header button{color:var(--muted)}
-#panel{background:var(--card);border-bottom:1px solid var(--line);display:none;overflow-y:auto;max-height:75vh;flex-shrink:0}
-#panel.open{display:block}
-.pbody{padding:14px 16px 20px}
-.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
-.tab{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;font-family:inherit}
-.tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-.tab-content{display:none} .tab-content.active{display:block}
-label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px}
-input[type=text],input[type=url],textarea,select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:11px 12px;font:14px/1.45 inherit;resize:vertical}
-textarea{min-height:80px}
-.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-.row button{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:10px 16px;font-size:14px;font-family:inherit;cursor:pointer}
-.row button.ghost{background:transparent;border:1px solid var(--line);color:var(--muted)}
-.row button.warn{background:transparent;border:1px solid #4a2020;color:var(--bad)}
-.row button:disabled{opacity:.45}
-.meta{font-size:12px;color:var(--muted);margin-top:10px;font-family:ui-monospace,monospace;line-height:1.6;white-space:pre-wrap}
-.infobox{font-size:13px;color:var(--accent);background:#0e1a24;border:1px solid #1a2f45;border-radius:8px;padding:12px;margin-top:10px;line-height:1.6}
-.warnbox{font-size:12px;color:var(--gold);background:#241d0e;border:1px solid #4a3a1a;border-radius:8px;padding:10px;margin-top:10px;line-height:1.55}
-.errbox,.okbox{font-size:12px;border-radius:8px;padding:10px;margin-top:10px;display:none}
-.errbox{color:var(--bad);background:#241010;border:1px solid #4a1a1a}
-.okbox{color:var(--ok);background:#0e2418;border:1px solid #1a3a2a}
-.toggle-row{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:14px}
-.toggle-row input{width:18px;height:18px;accent-color:var(--accent)}
-#chat{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;-webkit-overflow-scrolling:touch}
-.msg{max-width:90%;padding:11px 14px;border-radius:14px;font-size:15px;white-space:pre-wrap;word-break:break-word;line-height:1.55}
-.msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
-.msg.ai{align-self:flex-start;background:var(--card2);border:1px solid var(--line);border-bottom-left-radius:4px}
-.msg.sys{align-self:center;color:var(--muted);font-size:13px;font-style:italic;padding:6px 14px;text-align:center;max-width:96%;background:var(--card3);border-radius:20px}
-.msg .tag{display:block;font-size:11px;color:var(--gold);margin-bottom:4px;font-family:ui-monospace,monospace}
-.msg .fb{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
-.msg .fb button{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer}
-footer{padding:10px 12px;background:var(--card);border-top:1px solid var(--line);display:flex;gap:8px;flex-shrink:0;align-items:flex-end;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
-#input{flex:1;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:12px;padding:12px;font:15px/1.45 inherit;resize:none;max-height:110px;outline:none}
-#input:focus{border-color:var(--accent)}
-#mic{background:var(--card2);border:1px solid var(--line);color:var(--muted);border-radius:12px;padding:0 14px;font-size:18px;height:44px;min-width:48px;cursor:pointer}
-#mic.listening{background:#3a1a1a;border-color:var(--bad);color:var(--bad)}
-#send{background:var(--accent);color:#fff;border:0;border-radius:12px;padding:0 18px;font-size:15px;height:44px;min-width:64px;cursor:pointer}
-.progress{height:4px;background:var(--line);border-radius:2px;margin-top:10px;overflow:hidden;display:none}
-.progress i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
-.learn-result{max-height:160px;overflow-y:auto;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:10px;font-size:13px;line-height:1.5}
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
-.modal-bg.show{display:flex}
-.modal{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;width:100%;max-width:440px;max-height:80vh;overflow-y:auto}
-.modal h3{color:var(--gold);margin-bottom:12px;font-size:16px}
-.list-item{padding:10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;font-size:13px;display:flex;gap:8px;background:var(--bg)}
-.list-item .del{color:var(--bad);border:1px solid #4a2020;background:transparent;border-radius:5px;padding:3px 8px;font-size:12px;cursor:pointer;flex-shrink:0}
-.persona-chip{padding:6px 14px;border-radius:20px;border:1px solid var(--line);font-size:13px;cursor:pointer;background:var(--bg);display:inline-block;margin:3px}
-.persona-chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+body{background:var(--bg);color:var(--tx);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding-bottom:20px}
+button,input,select{font:inherit;touch-action:manipulation}
+button{background:#2a2a3a;color:var(--tx);border:1px solid var(--ln);border-radius:8px;padding:10px 12px;min-height:44px;cursor:pointer}
+button.primary{background:#3d5a80;border-color:#5a7aa0}button.danger{background:#5a3030;border-color:#8a5050}
+button.sm{padding:8px 10px;min-height:36px;font-size:12px}button:disabled{opacity:.35}
+input,select{background:#12121a;color:var(--tx);border:1px solid var(--ln);border-radius:8px;padding:10px;min-height:40px}
+header{background:#14141c;border-bottom:1px solid var(--ln);padding:12px 14px;position:sticky;top:0;z-index:20}
+.brand{font-size:17px;font-weight:700;color:var(--g)}.sub{font-size:11px;color:var(--mu);margin-top:2px}
+main{max-width:640px;margin:0 auto;padding:8px}
+.win{background:var(--p);border:1px solid var(--ln);border-radius:10px;overflow:hidden;margin-bottom:8px}
+.wt{background:var(--p2);padding:10px 12px;font-size:13px;font-weight:600;color:var(--g);border-bottom:1px solid var(--ln);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
+.wb{padding:10px 12px}
+.tabs{display:flex;overflow-x:auto;gap:4px;padding:8px;background:var(--p2);border-bottom:1px solid var(--ln);-webkit-overflow-scrolling:touch}
+.tabs button{flex:0 0 auto;font-size:12px;padding:8px 12px;border-radius:6px;white-space:nowrap}.tabs .on{background:#3d5a80;color:#fff}
+.view{display:none}.view.on{display:block}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.stat{background:#12121a;border:1px solid var(--ln);border-radius:8px;padding:8px;font-size:11px}
+.stat b{display:block;font-size:15px;margin-top:2px}
+.bar{height:5px;background:#2a2030;border-radius:3px;margin-top:4px;overflow:hidden}.bar i{display:block;height:100%;background:var(--r)}
+.bar.mp i{background:var(--b)}.bar.xp i{background:var(--pu)}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.mu{color:var(--mu);font-size:12px}
+.char-card{background:#12121a;border:1px solid var(--ln);border-radius:10px;padding:14px;margin-bottom:10px}
+.char-card b{color:var(--g);font-size:16px}
+.char-card .btns{display:flex;gap:10px;margin-top:12px}
+.char-card .btns button{flex:1;min-height:48px;font-size:15px}
+.item{padding:12px 0;border-bottom:1px solid #222230}
+.item:last-child{border:0}
+.普通{color:#c0c0c0}.魔法{color:#7ab0e0}.稀有{color:#d4b56a}.史詩{color:#b090e0}.傳奇{color:#e09060}.獨特{color:#c9a84c}.套裝{color:#6ecf8a}
+.pill{display:inline-block;font-size:10px;padding:2px 6px;border-radius:4px;background:#222230;color:var(--mu);margin-left:4px}
+.eq-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.eq-slot{background:#12121a;border:1px solid var(--ln);border-radius:8px;padding:8px;min-height:56px;font-size:12px}
+.eq-slot .lab{color:var(--mu);font-size:10px;margin-bottom:3px}
+.log{height:180px;overflow-y:auto;background:#0c0c12;border:1px solid var(--ln);border-radius:8px;padding:8px;font-size:11px;font-family:ui-monospace,monospace}
+.log p{margin:0 0 3px}.log .t{color:#555}.log .dmg{color:var(--or)}.log .heal{color:var(--gn)}.log .drop{color:var(--g)}.log .sys{color:var(--b)}.log .warn{color:var(--r)}.log .sum{color:var(--pu)}.log .ele{color:#e0a060}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
+.info-box{background:#12121a;border:1px solid var(--ln);border-radius:8px;padding:10px;font-size:12px}
+.info-box .t{color:var(--g);font-size:11px;margin-bottom:4px;font-weight:600}
+.attr-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #222230}
+.attr-ctrl button{min-width:44px;min-height:44px;font-size:18px;font-weight:700}
+.sell-bar{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.sell-bar button{flex:1 1 30%;min-width:80px}
+.notice{font-size:11px;color:#a09070;border:1px dashed #5a5040;padding:8px;border-radius:6px;margin-top:8px}
+.hidden{display:none!important}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:300;display:flex;align-items:flex-end;justify-content:center}
+.dialog{background:var(--p);border:1px solid var(--ln);border-radius:16px 16px 0 0;padding:20px;width:100%;max-width:640px;max-height:75vh;overflow:auto}
+.dialog h3{color:var(--g);margin-bottom:12px;font-size:17px}
+.dialog .actions{display:flex;gap:10px;margin-top:16px}
+.dialog .actions button{flex:1;min-height:48px;font-size:15px}
+.class-card{background:#12121a;border:1px solid var(--ln);border-radius:10px;padding:12px;margin:6px 0}
+.class-card.on{border-color:var(--g)}
+.class-card h4{color:var(--g);margin-bottom:4px}
+.sk-card{background:#12121a;border:1px solid var(--ln);border-radius:8px;padding:10px;margin:6px 0}
+.enemy-box{background:#12121a;border:1px solid var(--ln);border-radius:8px;padding:10px;margin:6px 0;font-size:12px}
+.zone-scroll{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.zone-scroll button{flex:0 0 auto;white-space:nowrap}
+.minion{font-size:12px;padding:4px 0;border-bottom:1px solid #222}
+.cfg label{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #1e1e28;font-size:13px}
+.link{color:var(--gn);text-decoration:underline;cursor:pointer}
 </style>
 </head>
 <body>
 <header>
-  <h1>鈕釦 AI v24.0</h1>
-  <select id="personaSelect"></select>
-  <span class="arch" id="bankInfo">v13.0</span>
-  <span class="status" id="status">載入中</span>
-  <button id="gear">⚙</button>
+  <div class="brand">深淵遠征：無燼紀元</div>
+  <div class="sub">v1.0 · 多怪圍攻 · 詞綴抗性 · 專精 · 中文符文</div>
 </header>
-
-<div id="panel">
-  <div class="pbody">
-    <div class="tabs">
-      <button class="tab active" data-tab="url">網址學習</button>
-      <button class="tab" data-tab="pair">問答對</button>
-      <button class="tab" data-tab="persona">人格</button>
-      <button class="tab" data-tab="mem">記憶</button>
-      <button class="tab" data-tab="set">設定</button>
+<main>
+<section id="charSelect" class="win">
+  <div class="wt">選擇角色（最多2名）</div>
+  <div class="wb" id="slotList"></div>
+  <div id="createArea" class="wb hidden">
+    <div class="mu" style="margin-bottom:4px">角色名稱</div>
+    <input id="newName" value="遠征者" maxlength="16" style="width:100%;margin-bottom:10px">
+    <div class="mu" style="margin-bottom:4px">選擇職業</div>
+    <div id="classGrid"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="primary" id="btnCreate" style="flex:1">確認建立</button>
+      <button id="btnCancelCreate" style="flex:1">取消</button>
     </div>
-
-    <div class="tab-content active" id="tab-url">
-      <div class="infobox">
-        <b>正確的學習方式</b><br>
-        貼上網址後，鈕釦會嘗試讀取文章正文、標題、段落、清單、表格、連結、表單選項與結構化資料；並可沿著同網站連結繼續讀取多頁。原文會保留在本機「來源資料庫」，另整理成可檢索的知識片段。<b>限制：</b>登入牆、付費牆、網站反爬蟲、JavaScript 動態內容或代理失效時，瀏覽器版仍可能讀不到，不能保證任何網站的每個字都抓得到。
-      </div>
-      <label>網址（必填）</label>
-      <input type="url" id="learnUrl" placeholder="https://news.example.com/article/123">
-      <label>意圖名稱（可留空，我會自動取名）</label>
-      <input type="text" id="learnIntent" placeholder="例如：科技新聞、寫作風格、健康知識">
-      <div class="toggle-row"><input type="checkbox" id="autoIntent" checked><span>自動根據頁面標題建立意圖</span></div>
-      <div class="toggle-row"><input type="checkbox" id="learnStyle" checked><span>同時學習用詞與句子結構</span></div>
-      <div class="toggle-row"><input type="checkbox" id="makePairs" checked><span>自動產生問答對（只作候選，不代表已驗證）</span></div>
-      <label>爬取範圍</label>
-      <div class="row">
-        <select id="crawlPages" style="flex:1"><option value="1">只讀這一頁</option><option value="3">最多 3 頁</option><option value="5" selected>最多 5 頁</option><option value="8">最多 8 頁</option><option value="12">最多 12 頁</option></select>
-        <select id="crawlScope" style="flex:1"><option value="same" selected>只跟進同網站連結</option><option value="none">不跟進連結</option></select>
-      </div>
-      <div class="row">
-        <button id="learnUrlBtn">開始瀏覽並學習</button>
-        <button id="previewBtn" class="ghost">只預覽不學習</button>
-      </div>
-      <div class="progress" id="progress"><i id="progBar"></i></div>
-      <div id="learnResult" class="learn-result" style="display:none"></div>
-      <div class="meta" id="urlMeta"></div>
-      <label>來源資料庫（已保存的原文）</label>
-      <input id="sourceSearch" type="search" placeholder="搜尋已讀文章、網址或關鍵字">
-      <div class="row"><button id="searchSourcesBtn" class="ghost">搜尋來源</button><button id="showSourcesBtn" class="ghost">查看已保存來源</button></div>
-      <div id="sourceResults" class="learn-result" style="display:none"></div>
-    </div>
-
-    <div class="tab-content" id="tab-pair">
-      <label>問題</label><input type="text" id="pairQ">
-      <label>回答</label><textarea id="pairA" rows="2"></textarea>
-      <div class="row"><button id="addPairBtn">加入問答對</button><button id="managePairBtn" class="ghost">管理</button></div>
-      <div class="meta" id="pairMeta">0 組</div>
-    </div>
-
-    <div class="tab-content" id="tab-persona">
-      <div id="personaList" style="margin-bottom:10px"></div>
-      <label>新建人格</label>
-      <input type="text" id="newPersonaName" placeholder="名稱">
-      <div class="row">
-        <button id="createPersonaBtn">建立</button>
-        <button id="renamePersonaBtn" class="ghost">改名</button>
-        <button id="deletePersonaBtn" class="warn">刪除</button>
-      </div>
-    </div>
-
-    <div class="tab-content" id="tab-mem">
-      <label>手動加入（意圖|句子）</label>
-      <textarea id="newData"></textarea>
-      <div class="row">
-        <button id="addBtn">加入</button>
-        <button id="statsBtn" class="ghost">統計</button>
-        <button id="exportBtn" class="ghost">匯出</button>
-        <button id="importBtn" class="ghost">匯入</button>
-      </div>
-      <div class="row">
-        <button id="manageBtn" class="ghost">管理</button>
-        <button id="clearChatBtn" class="ghost">清空對話</button>
-        <button id="resetBtn" class="warn">清空此人格</button>
-      </div>
-      <div class="meta" id="meta"></div>
-    </div>
-
-    <div class="tab-content" id="tab-set">
-      <div class="toggle-row"><input type="checkbox" id="autoLearn"><span>低信心問題加入候選記錄（不直接當成正式知識）</span></div>
-      <div class="toggle-row"><input type="checkbox" id="contextAware" checked><span>多輪上下文</span></div>
-      <div class="toggle-row"><input type="checkbox" id="autoSpeak"><span>自動朗讀</span></div>
-      <div class="toggle-row"><input type="checkbox" id="pairPriority" checked><span>問答對優先</span></div>
-      <div class="warnbox">安全與能力邊界：為繞過瀏覽器跨網域限制，可能會將公開網址交給第三方讀取代理；不要輸入私人、內網或帶有登入權杖的網址。網站若要求登入、使用動態腳本、封鎖代理或只提供部分內容，仍可能無法完整讀取。此版會保存抓到的原文與來源，並依關鍵字與段落排序檢索；它不是大型語言模型，不能只靠抓取就真正理解所有知識或保證答案正確。重要資料請定期匯出備份。</div>
-    </div>
-
-    <div class="errbox" id="errBox"></div>
-    <div class="okbox" id="okBox"></div>
   </div>
+</section>
+<div id="gameUI" class="hidden">
+  <section class="win">
+    <div class="wt"><span id="heroTitle">—</span>
+      <div class="row">
+        <button class="sm" id="btnBack">換角</button>
+        <button class="sm" id="btnSave">存檔</button>
+        <button class="sm" id="btnExport">匯出</button>
+        <button class="sm" id="btnImport">匯入</button>
+        <input id="fileIn" type="file" accept="application/json" class="hidden">
+      </div>
+    </div>
+    <div class="wb"><div class="stats" id="statBar"></div></div>
+  </section>
+  <section class="win">
+    <div class="tabs" id="tabs">
+      <button class="on" data-tab="hero">角色</button>
+      <button data-tab="hunt">狩獵</button>
+      <button data-tab="auto">自動</button>
+      <button data-tab="skills">技能</button>
+      <button data-tab="gear">裝備</button>
+      <button data-tab="runes">符文</button>
+      <button data-tab="shop">商人</button>
+    </div>
+    <div class="wb">
+      <div id="v-hero" class="view on"></div>
+      <div id="v-hunt" class="view"></div>
+      <div id="v-auto" class="view"></div>
+      <div id="v-skills" class="view"></div>
+      <div id="v-gear" class="view"></div>
+      <div id="v-runes" class="view"></div>
+      <div id="v-shop" class="view"></div>
+    </div>
+  </section>
+  <section class="win">
+    <div class="wt">戰鬥訊息 <button class="sm" id="btnClearLog">清除</button></div>
+    <div class="wb"><div id="logBox" class="log"></div></div>
+  </section>
 </div>
-
-<div id="chat"></div>
-<footer>
-  <button id="mic">🎤</button>
-  <textarea id="input" rows="1" placeholder="直接問我，或貼網址讓我學習..."></textarea>
-  <button id="send">送出</button>
-</footer>
-
-<div class="modal-bg" id="manageModal"><div class="modal"><h3>記憶管理</h3><div id="memList" style="max-height:50vh;overflow-y:auto"></div><div class="row"><button class="ghost" id="closeManage">關閉</button></div></div></div>
-<div class="modal-bg" id="pairModal"><div class="modal"><h3>問答對</h3><div id="pairList" style="max-height:50vh;overflow-y:auto"></div><div class="row"><button class="ghost" id="closePair">關閉</button></div></div></div>
-<div class="modal-bg" id="teachModal"><div class="modal"><h3>教它</h3><p id="teachQuery" style="color:var(--muted);font-size:13px;margin-bottom:8px"></p><label>意圖</label><input type="text" id="teachIntent"><label>回覆</label><textarea id="teachReply" rows="2"></textarea><div class="toggle-row"><input type="checkbox" id="teachAsPair" checked><span>存成問答對</span></div><div class="row"><button id="confirmTeach">確認</button><button class="ghost" id="cancelTeach">取消</button></div></div></div>
-
+</main>
+<div id="overlay" class="overlay hidden">
+  <div class="dialog"><h3 id="dlgTitle">提示</h3><div id="dlgBody" class="mu"></div><div class="actions" id="dlgActions"></div></div>
+</div>
 <script>
-const HASH=256, TOPK=8, MIN=0.17, PMIN=0.21, CTX=0.2, MP=0.2, LS='pai_v9';
-let root={active:'預設',personas:{}}, cur=null, bank=[], pairs=[], inv=new Map(), mk={bigram:{},trigram:{}};
-let hist=[], lastU='', recog=null, listen=false, learned=0;
+(function(){
+"use strict";
+var STORE="abyss_v10", MAX_LV=100;
+var $=function(id){return document.getElementById(id)};
+var rnd=function(a,b){return Math.floor(Math.random()*(b-a+1))+a};
+var pick=function(a){return a[Math.floor(Math.random()*a.length)]};
+var uid=function(){return Math.random().toString(36).slice(2,9)};
+var esc=function(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")};
 
-const $=id=>document.getElementById(id);
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-function tok(t){const c=(t||'').toLowerCase().match(/[\u4e00-\u9fff]|[a-z0-9]+/g)||[];const o=[...c];for(let i=0;i<c.length-1;i++)o.push(c[i]+c[i+1]);for(let i=0;i<c.length-2;i++)o.push(c[i]+c[i+1]+c[i+2]);return o}
-function hsh(t,s){let h=5381;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return((h%s)+s)%s}
-function vec(t){const v=new Array(HASH).fill(0);for(const x of tok(t))v[hsh(x,HASH)]++;let n=0;for(const x of v)n+=x*x;n=Math.sqrt(n)||1;return v.map(x=>x/n)}
-function dot(a,b){let s=0;for(let i=0;i<a.length;i++)s+=a[i]*b[i];return s}
-function split(t){if(!t)return[];return t.replace(/\r/g,'').split(/(?<=[。！？.!?])\s*|\n+/).map(s=>s.trim()).filter(s=>s.length>=5&&s.length<=220)}
-function clean(html){
-  return html.replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<style[\s\S]*?<\/style>/gi,' ')
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi,' ').replace(/<!--[\s\S]*?-->/g,' ')
-    .replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<')
-    .replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#\d+;/g,' ').replace(/\s+/g,' ').trim();
+function showDlg(title,body,buttons){
+  $("dlgTitle").textContent=title;
+  $("dlgBody").innerHTML=body;
+  var act=$("dlgActions"); act.innerHTML="";
+  (buttons||[{t:"確定",fn:null}]).forEach(function(b){
+    var btn=document.createElement("button");
+    btn.textContent=b.t;
+    if(b.danger)btn.className="danger";
+    if(b.primary)btn.className="primary";
+    btn.onclick=function(){$("overlay").classList.add("hidden");if(b.fn)b.fn()};
+    act.appendChild(btn);
+  });
+  $("overlay").classList.remove("hidden");
 }
-function extractTitle(html){
-  const m=html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)||html.match(/property="og:title"[^>]*content="([^"]+)"/i)||html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
-  return m?clean(m[1]).slice(0,60):'';
+function askYes(msg,onYes){
+  showDlg("確認",esc(msg),[{t:"確定",danger:true,fn:onYes},{t:"取消",fn:null}]);
 }
-function extractMain(html){
-  let main=html;
-  const candidates=[
-    /<article[^>]*>([\s\S]*?)<\/article>/i,
-    /<main[^>]*>([\s\S]*?)<\/main>/i,
-    /class="[^"]*(?:article|content|post|entry|story)[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-    /id="[^"]*(?:content|article|main)[^"]*"[^>]*>([\s\S]*?)<\/div>/i
+
+var CLASSES={
+  iron:{n:"裂鋼狂戰士",r:"武器技藝／狂怒戰勢／戰吼",b:[130,30,14,3,6],a:[28,12,28,8]},
+  bow:{n:"星弓遊俠",r:"弓術／獵手本能／原野盟約",b:[95,50,13,5,3],a:[14,32,16,12]},
+  mage:{n:"星界術士",r:"炎紋／霜界／雷序",b:[75,120,4,18,2],a:[8,14,12,38]},
+  soul:{n:"魂契召喚師",r:"魂僕軍團／衰朽咒文／骨魂術",b:[90,95,6,13,3],a:[10,12,20,30]},
+  shade:{n:"暮影刃客",r:"刃舞／機括陷阱／影之身法",b:[98,60,15,6,3],a:[16,30,14,12]},
+  wild:{n:"荒野先知",r:"風暴之語／獸形盟約／自然之靈",b:[110,70,10,12,4],a:[14,16,24,18]},
+  oath:{n:"聖誓守衛",r:"聖裁武技／守護靈光／懲戒靈光",b:[125,55,11,8,8],a:[22,10,32,10]}
+};
+var TREES={
+  iron:["武器技藝","狂怒戰勢","戰吼"],bow:["弓術","獵手本能","原野盟約"],
+  mage:["炎紋","霜界","雷序"],soul:["魂僕軍團","衰朽咒文","骨魂術"],
+  shade:["刃舞","機括陷阱","影之身法"],wild:["風暴之語","獸形盟約","自然之靈"],
+  oath:["聖裁武技","守護靈光","懲戒靈光"]
+};
+
+/* 技能：每系10個，專精限制只能投一系 */
+function buildSkills(cid){
+  var trees=TREES[cid], out=[], generic=[
+    {n:"裂擊",d:"造成2.0倍傷害",t:"attack",req:1,mul:2},
+    {n:"連段",d:"兩次1.0倍傷害",t:"attack",req:3,mul:1,hits:2},
+    {n:"專精",d:"永久主屬性+4%/級",t:"passive",req:2,atkPct:4},
+    {n:"護勢",d:"3回合防禦+25%",t:"buff",req:4,defBuff:0.25,dur:3},
+    {n:"破陣",d:"造成2.6倍傷害",t:"attack",req:6,mul:2.6},
+    {n:"回復",d:"回復16%生命",t:"heal",req:5,healPct:0.16},
+    {n:"強化",d:"永久生命+3%/級",t:"passive",req:7,hpPct:3},
+    {n:"終結",d:"造成3.8倍傷害",t:"attack",req:10,mul:3.8},
+    {n:"戰意",d:"3回合攻擊+22%",t:"buff",req:8,atkBuff:0.22,dur:3},
+    {n:"奧義",d:"造成5.2倍傷害",t:"attack",req:14,mul:5.2}
   ];
-  for(const re of candidates){
-    const m=html.match(re);
-    if(m&&m[1]&&m[1].length>200){main=m[1];break}
+  var soulSpec={
+    "魂僕軍團":[
+      {n:"召喚骨僕",d:"召喚2隻骨僕（坦克）",t:"summon",req:1,min:{n:"骨僕",c:2,am:0.45,hm:0.55,tank:1}},
+      {n:"墓衛契約",d:"召喚2隻墓衛",t:"summon",req:3,min:{n:"墓衛",c:2,am:0.3,hm:0.95,tank:1}},
+      {n:"魂僕強化",d:"永久召攻+8% 召血+6%/級",t:"passive",req:2,sumAtk:8,sumHp:6},
+      {n:"縫合獸",d:"召喚2隻縫合獸",t:"summon",req:6,min:{n:"縫合獸",c:2,am:0.9,hm:0.6,tank:1}},
+      {n:"亡骸術士",d:"召喚2隻亡骸術士",t:"summon",req:8,min:{n:"亡骸術士",c:2,am:0.75,hm:0.28,tank:0}},
+      {n:"軍團契印",d:"永久召喚上限+2/級",t:"passive",req:5,sumCap:2},
+      {n:"魂鏈共鳴",d:"回復14%生命",t:"heal",req:7,healPct:0.14},
+      {n:"墓穴領主",d:"召喚3隻強化骨僕",t:"summon",req:11,min:{n:"強化骨僕",c:3,am:0.58,hm:0.52,tank:1}},
+      {n:"萬魂歸一",d:"全軍團每隻攻擊×2",t:"spell",req:15,armyBurst:2},
+      {n:"骨僕重塑",d:"永久召血+8%/級",t:"passive",req:4,sumHp:8}
+    ],
+    "衰朽咒文":[
+      {n:"生命凋零",d:"4回合每回合扣敵最大生命8%",t:"dot",req:1,dot:0.08,dotDur:4},
+      {n:"腐敗印記",d:"敵防-25% 3回合",t:"debuff",req:2,defDown:0.25,dur:3},
+      {n:"疫病學識",d:"永久法傷+4%/級",t:"passive",req:3,spellPct:4},
+      {n:"靈魂枯竭",d:"1.8倍法傷汲取30%",t:"spell",req:5,mul:1.8,vamp:0.3},
+      {n:"虛脫詛咒",d:"1.5倍 敵攻-20% 3回合",t:"debuff",req:8,mul:1.5,atkDown:0.2,dur:3},
+      {n:"腐骨侵蝕",d:"2.5倍+3回合重凋零",t:"dot",req:9,mul:2.5,dot:0.12,dotDur:3},
+      {n:"亡者低語",d:"回復20%魔力",t:"heal",req:7,mpPct:0.2},
+      {n:"終焉衰朽",d:"4倍 有凋零再+50%",t:"spell",req:14,mul:4,dotBonus:0.5},
+      {n:"衰朽抗性",d:"永久全抗+3/級",t:"passive",req:4,res:3},
+      {n:"疫病擴散",d:"有凋零則立即結算",t:"dot",req:6,dotExtend:1}
+    ],
+    "骨魂術":[
+      {n:"骨刺穿心",d:"2.1倍骨刺法傷",t:"spell",req:1,mul:2.1},
+      {n:"骨盾環身",d:"護盾=生命20%",t:"shield",req:2,shieldPct:0.2},
+      {n:"骨魂親和",d:"永久法傷+3% 生命+2%/級",t:"passive",req:3,spellPct:3,hpPct:2},
+      {n:"骨牢禁錮",d:"1.4倍 敵攻-35% 2回合",t:"control",req:5,mul:1.4,atkDown:0.35,dur:2},
+      {n:"骸骨尖刺",d:"2.6倍傷害",t:"spell",req:6,mul:2.6},
+      {n:"骨牆壁壘",d:"永久防禦+4%/級",t:"passive",req:4,defPct:4},
+      {n:"骨魂修復",d:"回復18%生命",t:"heal",req:7,healPct:0.18},
+      {n:"骸骨共振",d:"3.8倍骨魂傷害",t:"spell",req:12,mul:3.8},
+      {n:"萬骨朝宗",d:"5.2倍並獲護盾",t:"spell",req:15,mul:5.2,shieldPct:0.15},
+      {n:"魂骨爆破",d:"3.0倍傷害",t:"spell",req:9,mul:3}
+    ]
+  };
+  for(var ti=0;ti<trees.length;ti++){
+    var tr=trees[ti];
+    var list=(cid==="soul"&&soulSpec[tr])?soulSpec[tr]:generic;
+    for(var j=0;j<list.length;j++){
+      var s=list[j];
+      out.push(Object.assign({key:tr+"::"+s.n,tree:tr},s));
+    }
   }
-  return clean(main);
+  return out;
 }
 
-function defP(){return{data:{},pairs:[],feedback:{},sources:[],candidates:[]}}
-const BACKUP_LS=LS+'_backup_v1';
-function validRoot(o){
-  return !!o && typeof o==='object' && o.personas && typeof o.personas==='object'
-    && Object.values(o.personas).every(p=>p && typeof p==='object'
-      && (!p.data || typeof p.data==='object')
-      && (!p.pairs || Array.isArray(p.pairs)));
+var AFFIX_CN={atk:"攻擊",spell:"法術傷害",def:"防禦",fire:"火焰傷害",cold:"冰冷傷害",light:"閃電傷害",poison:"毒素傷害",holy:"神聖傷害",str:"力量",dex:"敏捷",hp:"生命",mp:"魔力",res:"全抗性",atkPct:"攻擊加成",spellPct:"法術加成",defPct:"防禦加成",hpPct:"生命加成",mpPct:"魔力加成",firePct:"火焰加成",coldPct:"冰冷加成",lightPct:"閃電加成",lifeRegen:"生命恢復",lifeSteal:"生命偷取",summonAtk:"召喚物攻擊",summonHp:"召喚物生命",summonCap:"召喚上限",fireRes:"火焰抗性",coldRes:"冰冷抗性",lightRes:"閃電抗性",poisonRes:"毒素抗性",curseRes:"詛咒抗性"};
+function fmtAffix(k,v){var n=AFFIX_CN[k]||k;var p=(k.indexOf("Pct")>=0||k.indexOf("Res")>=0||k==="lifeSteal")?"%":"";return n+" +"+v+p}
+
+var PRE=[["強力的",{atk:[3,8]},1],["鋒利的",{atkPct:[4,12]},1],["堅韌的",{def:[3,8],hp:[6,16]},1],["迅捷的",{dex:[2,7]},1],["活力的",{hp:[10,22]},1],["灼傷的",{fire:[3,10]},1],["冰結的",{cold:[3,10]},1],["電擊的",{light:[3,10]},1],["烈焰的",{firePct:[10,20]},2],["霜寒的",{coldPct:[10,20]},2],["雷霆的",{lightPct:[10,20]},2],["猛擊的",{atkPct:[10,18]},2],["守護的",{defPct:[10,20],res:[4,10]},2],["抗火的",{fireRes:[8,18]},2],["抗冰的",{coldRes:[8,18]},2],["抗雷的",{lightRes:[8,18]},2],["煉獄的",{firePct:[16,30],atkPct:[8,14]},3],["不朽的",{hpPct:[14,28],defPct:[12,22]},3],["深淵的",{spellPct:[14,30],res:[8,16]},3],["屠戮的",{atkPct:[16,30],lifeSteal:[2,5]},3]];
+var SUF=[["之力量",{str:[3,10]},1],["之敏捷",{dex:[3,10]},1],["之耐力",{hp:[8,20]},1],["之守護",{def:[3,10]},1],["之火花",{fire:[3,9]},1],["之恢復",{lifeRegen:[1,3]},1],["之烈焰",{firePct:[10,20]},2],["之掠奪",{lifeSteal:[2,5]},2],["之抗衡",{res:[6,14]},2],["之法能",{spellPct:[8,16]},2],["之永生",{hpPct:[16,30],lifeRegen:[2,5]},3],["之毀滅",{atkPct:[18,34],lifeSteal:[3,6]},3]];
+var BASES=[["粗布兜帽","頭盔",1,[0,0],[1,4],0],["裂紋鐵盔","頭盔",8,[0,0],[6,16],2],["守誓冠冕","頭盔",20,[0,0],[20,42],3],["荒旅外衣","身體",1,[0,0],[2,8],0],["黑鋼胸鎧","身體",10,[0,0],[14,30],3],["深淵板甲","身體",24,[0,0],[32,68],4],["銅短刃","主手",1,[3,8],[0,0],0],["秘銀長兵","主手",10,[12,26],[0,0],3],["星隕巨刃","主手",24,[30,60],[0,0],5],["木紋圓盾","副手",1,[0,0],[2,8],0],["黑曜壁盾","副手",12,[0,0],[14,32],3],["銅戒指","戒指",1,[0,3],[0,0],0],["秘銀戒指","戒指",12,[3,10],[0,0],1],["星晶戒指","戒指",22,[10,24],[0,0],2],["行軍腰帶","腰帶",1,[0,0],[1,5],0],["深袋戰帶","腰帶",10,[0,0],[8,18],2],["旅者軟靴","鞋子",1,[0,0],[1,4],0],["疾行護脛","鞋子",12,[0,0],[8,18],2],["骨紋項鍊","項鍊",1,[2,6],[0,0],0],["太陽墜飾","項鍊",14,[10,26],[0,0],2],["白骨長劍","主手",5,[6,14],[0,0],2],["無印板甲","身體",15,[0,0],[18,40],4],["空殼戰盔","頭盔",15,[0,0],[12,28],3],["六孔秘銀","主手",30,[35,70],[0,0],6]];
+var UNIQUES=[{name:"無燼之冠",slot:"頭盔",il:20,req:18,mods:{hp:45,defPct:18,res:12,spellPct:14,fireRes:15},bs:{def:30},desc:"深淵唯一冠冕"},{name:"裂谷之牙",slot:"主手",il:18,req:16,mods:{atkPct:25,lifeSteal:5,fire:14},bs:{atk:35},desc:"裂谷吞噬者獠牙"},{name:"萬魂骨戒",slot:"戒指",il:15,req:12,mods:{summonAtk:20,summonHp:18,hp:30,summonCap:1},bs:{spell:10},desc:"召喚師之戒"},{name:"星隕裁決",slot:"主手",il:26,req:24,mods:{atkPct:38,holy:22,lifeSteal:5},bs:{atk:50},desc:"星隕巨刃"},{name:"深淵之眼",slot:"戒指",il:24,req:22,mods:{spellPct:32,mpPct:22,firePct:16,fireRes:20},bs:{spell:20},desc:"深淵獨眼"}];
+var SETS_INFO={"魂僕軍團":{pieces:["軍團骨盔","軍團骨甲","軍團骨杖"],bonus:["2件：召攻+14% 召血+11%","3件：召攻+28% 召血+22% 召限+2"]},"衰朽咒文":{pieces:["衰朽面紗","衰朽袍","衰朽戒"],bonus:["2件：法傷+11%","3件：法傷+22% 魔力+15%"]},"裂鋼戰意":{pieces:["裂鋼戰盔","裂鋼胸甲","裂鋼巨刃"],bonus:["2件：攻擊+12%","3件：攻擊+25% 生命+30"]},"炎紋之印":{pieces:["炎紋冠","炎紋袍","炎紋杖"],bonus:["2件：火焰+15%","3件：火焰+30% 法傷+15%"]}};
+
+/* 純中文符文 */
+var RUNES=[
+  {id:"燼核",n:"燼核",t:1,m:{atk:5}},{id:"塵晶",n:"塵晶",t:1,m:{atkPct:6}},
+  {id:"脈流",n:"脈流",t:1,m:{mp:14}},{id:"裂片",n:"裂片",t:1,m:{def:6}},
+  {id:"餘焰",n:"餘焰",t:2,m:{fire:10}},{id:"霜髓",n:"霜髓",t:2,m:{cold:10}},
+  {id:"電弧",n:"電弧",t:2,m:{light:10}},{id:"毒牙",n:"毒牙",t:2,m:{poison:10}},
+  {id:"沉鐵",n:"沉鐵",t:3,m:{defPct:8,hp:14}},{id:"疾風",n:"疾風",t:3,m:{dex:8}},
+  {id:"血露",n:"血露",t:3,m:{lifeSteal:3}},{id:"心核",n:"心核",t:3,m:{hp:20}},
+  {id:"虛隙",n:"虛隙",t:4,m:{spellPct:12}},{id:"潮汐",n:"潮汐",t:4,m:{mpPct:12}},
+  {id:"磐石",n:"磐石",t:4,m:{res:10}},{id:"獠牙",n:"獠牙",t:5,m:{atkPct:14}},
+  {id:"冠冕",n:"冠冕",t:5,m:{str:12}},{id:"薄霧",n:"薄霧",t:5,m:{dex:12}},
+  {id:"鍛焰",n:"鍛焰",t:6,m:{firePct:16,atkPct:8}},{id:"深淵",n:"深淵",t:6,m:{spellPct:16}},
+  {id:"誓約",n:"誓約",t:6,m:{holy:14}},{id:"崩壞",n:"崩壞",t:7,m:{atkPct:20,lifeSteal:3}},
+  {id:"蝕日",n:"蝕日",t:7,m:{spellPct:20,res:12}},{id:"錨定",n:"錨定",t:7,m:{hpPct:16}},
+  {id:"新星",n:"新星",t:8,m:{atkPct:22,spellPct:14}},{id:"幽靈",n:"幽靈",t:8,m:{summonAtk:16,summonHp:14}},
+  {id:"暴君",n:"暴君",t:8,m:{atkPct:24}},{id:"聖域",n:"聖域",t:9,m:{hpPct:22,res:16}},
+  {id:"災變",n:"災變",t:9,m:{firePct:24,spellPct:20}},{id:"永恆",n:"永恆",t:9,m:{hpPct:24,mpPct:16}},
+  {id:"湮滅",n:"湮滅",t:10,m:{atkPct:30,spellPct:24}},{id:"起源",n:"起源",t:10,m:{hpPct:26,summonCap:2}},
+  {id:"極點",n:"極點",t:10,m:{atkPct:32,spellPct:26,res:14}}
+];
+/* 舊英文ID對照遷移 */
+var RUNE_MIG={Ash:"燼核",Dust:"塵晶",Vein:"脈流",Shard:"裂片",Ember:"餘焰",Frost:"霜髓",Spark:"電弧",Venom:"毒牙",Iron:"沉鐵",Gale:"疾風",Blood:"血露",Core:"心核",Void:"虛隙",Tide:"潮汐",Stone:"磐石",Fang:"獠牙",Crown:"冠冕",Mist:"薄霧",Forge:"鍛焰",Abyss:"深淵",Oath:"誓約",Ruin:"崩壞",Eclipse:"蝕日",Anchor:"錨定",Nova:"新星",Wraith:"幽靈",Tyrant:"暴君",Sanctum:"聖域",Cataclysm:"災變",Eternal:"永恆",Oblivion:"湮滅",Genesis:"起源",Apex:"極點"};
+
+var RUNEWORDS=[
+  /* 通用7種 */
+  {name:"初芒",r:["燼核","塵晶"],s:2,m:{atkPct:14,def:8},d:"通用近戰"},
+  {name:"流火",r:["餘焰","脈流"],s:2,m:{fire:16,mp:20},d:"通用火焰"},
+  {name:"寒脈",r:["霜髓","裂片"],s:2,m:{cold:14,def:10},d:"通用冰霜"},
+  {name:"雷芽",r:["電弧","塵晶"],s:2,m:{light:14,atkPct:8},d:"通用閃電"},
+  {name:"鐵壁",r:["沉鐵","心核","磐石"],s:3,m:{defPct:20,hp:35,res:10},d:"通用防禦"},
+  {name:"血誓",r:["血露","獠牙","心核"],s:3,m:{atkPct:18,lifeSteal:5,hp:22},d:"通用吸血"},
+  {name:"無燼王座",r:["聖域","永恆","極點"],s:3,m:{hpPct:28,atkPct:20,spellPct:20,res:18},d:"通用終局"},
+  /* 召喚 */
+  {name:"軍團號角",r:["幽靈","心核","起源"],s:3,m:{summonAtk:24,summonHp:20,summonCap:2},d:"召喚專屬"},
+  {name:"起源契約",r:["起源","幽靈","誓約","永恆"],s:4,m:{summonAtk:32,summonHp:28,summonCap:3,hpPct:16},d:"召喚終極"},
+  /* 法師 */
+  {name:"虛空低語",r:["虛隙","潮汐","深淵"],s:3,m:{spellPct:24,mpPct:18,res:8},d:"法師"},
+  {name:"災變星隕",r:["災變","新星","湮滅"],s:3,m:{firePct:28,spellPct:26,atkPct:12},d:"法師元素"},
+  /* 戰士 */
+  {name:"破陣之矛",r:["獠牙","鍛焰","崩壞"],s:3,m:{atkPct:26,firePct:14,lifeSteal:4},d:"戰士"},
+  {name:"萬軍鐵蹄",r:["沉鐵","冠冕","暴君"],s:3,m:{atkPct:22,defPct:14,hp:40},d:"戰士防攻"},
+  /* 遊俠 */
+  {name:"穿雲長矢",r:["疾風","薄霧","獠牙"],s:3,m:{atkPct:24,dex:16,lifeSteal:3},d:"遊俠"},
+  {name:"猎星之眼",r:["薄霧","新星","極點"],s:3,m:{atkPct:28,dex:12,spellPct:10},d:"遊俠終局"},
+  /* 影 */
+  {name:"永夜帷幕",r:["蝕日","薄霧","虛隙"],s:3,m:{spellPct:22,dex:14,res:12},d:"影"},
+  {name:"千影殺陣",r:["崩壞","薄霧","湮滅"],s:3,m:{atkPct:30,lifeSteal:5,dex:10},d:"影終局"},
+  /* 荒野 */
+  {name:"風暴之冠",r:["電弧","潮汐","深淵"],s:3,m:{light:20,spellPct:18,mpPct:12},d:"荒野"},
+  {name:"古木之心",r:["錨定","磐石","聖域"],s:3,m:{hpPct:24,defPct:16,res:14},d:"荒野防"},
+  /* 聖誓 */
+  {name:"聖裁之錘",r:["誓約","冠冕","鍛焰"],s:3,m:{atkPct:20,holy:18,hp:25},d:"聖誓"},
+  {name:"永恆壁壘",r:["聖域","錨定","磐石","永恆"],s:4,m:{defPct:28,hpPct:22,res:20},d:"聖誓防"}
+];
+
+var POTIONS=[{id:"hpS",n:"微型生命藥劑",type:"hp",v:45,p:12},{id:"hpM",n:"中型生命藥劑",type:"hp",v:100,p:40},{id:"hpL",n:"強效生命藥劑",type:"hp",v:180,p:85},{id:"mpS",n:"微型魔力藥劑",type:"mp",v:40,p:12},{id:"mpM",n:"中型魔力藥劑",type:"mp",v:90,p:40},{id:"mpL",n:"強效魔力藥劑",type:"mp",v:160,p:85},{id:"town",n:"歸營卷軸",type:"town",v:1,p:35},{id:"idS",n:"鑑定卷軸",type:"id",v:1,p:22}];
+var DROP_POT=[{id:"hpX",n:"深淵生命藥劑",type:"hp",v:320},{id:"mpX",n:"深淵魔力藥劑",type:"mp",v:280}];
+var DIFF=[["普通",1,1],["夢魘",2.4,2.0],["煉獄",6.5,4.5]];
+var ZONES=[
+  {id:0,name:"裂隙荒原",min:1,mobs:["灰燼穴民","碎甲獵犬"],boss:"裂谷吞噬者",champ:["裂隙哨兵"],unique:false},
+  {id:1,name:"沉鐘墓道",min:5,mobs:["墓塵行刑者","腐鐘巡衛"],boss:"沉鐘主祭",champ:["墓道監工"],unique:false},
+  {id:2,name:"黑鹽峽谷",min:10,mobs:["黑鹽巨魔","裂岩重兵"],boss:"黑鹽巨像",champ:["鹽晶守衛"],unique:false},
+  {id:3,name:"失序要塞",min:16,mobs:["無面監軍","裂誓術徒"],boss:"失序統帥",champ:["失序百夫長"],unique:false},
+  {id:4,name:"無燼深淵",min:22,mobs:["深淵孵化體","無燼行者"],boss:"深淵孵主",champ:["深淵先驅"],unique:false},
+  {id:5,name:"血霧沼澤",min:8,mobs:["血霧水鬼","腐根纏繞者"],boss:"沼淵巨蝰",champ:["血霧巫醫"],unique:false},
+  {id:6,name:"霜裂冰原",min:14,mobs:["霜裂狼","冰晶巨人"],boss:"霜裂女皇",champ:["冰原巡守"],unique:false},
+  {id:7,name:"星隕遺址",min:25,mobs:["星隕殘骸","虛空行者"],boss:"星隕守護者",champ:["遺址守衛長"],unique:false},
+  {id:8,name:"諸王陵寢",min:30,mobs:[],boss:"",champ:[],unique:true,bosses:["裂谷吞噬者","沉鐘主祭","黑鹽巨像","失序統帥","深淵孵主","沼淵巨蝰","霜裂女皇","星隕守護者"]}
+];
+var SLOTS=["頭盔","身體","主手","副手","戒指1","戒指2","腰帶","鞋子","項鍊"];
+var MOB_AFFIXES=[
+  {n:"狂暴",atkM:1.35,hpM:1.1,ele:null},
+  {n:"鐵皮",atkM:1.05,hpM:1.5,defM:1.4,ele:null},
+  {n:"灼熱",atkM:1.15,hpM:1.1,ele:"fire",elePct:0.35,res:{fire:40}},
+  {n:"霜凍",atkM:1.1,hpM:1.15,ele:"cold",elePct:0.3,res:{cold:40}},
+  {n:"雷殛",atkM:1.2,hpM:1.05,ele:"light",elePct:0.35,res:{light:40}},
+  {n:"劇毒",atkM:1.1,hpM:1.1,ele:"poison",elePct:0.25,res:{poison:50}},
+  {n:"詛咒",atkM:1.15,hpM:1.1,ele:"curse",elePct:0.2,res:{curse:35}},
+  {n:"迅捷",atkM:1.4,hpM:0.9,ele:null},
+  {n:"秘藏",atkM:1.1,hpM:1.1,lootM:1.8,ele:null},
+  {n:"深淵",atkM:1.5,hpM:1.6,ele:"fire",elePct:0.4,res:{fire:50,cold:30,light:30}}
+];
+
+var slots=[null,null],active=-1,S=null,pack=[],autoTimer=null,autoOn=false,selClass="iron";
+
+function defAuto(){return{skills:[],reSummon:true,preferSkill:true,hpPot:"hpS",mpPot:"mpS",hpTh:0.35,mpTh:0.25,loot:{"普通":"sell","魔法":true,"稀有":true,"史詩":true,"傳奇":true,"獨特":true,"套裝":true,sock:true}}}
+function fresh(cid,name){
+  var b=CLASSES[cid].b,a=CLASSES[cid].a;
+  return{name:name||"遠征者",cid:cid,lv:1,xp:0,sp:1,ap:1,gold:150,kills:0,boss:0,diff:0,zone:0,
+    hp:b[0],mhp:b[0],mp:b[1],mmp:b[1],atk:b[2],spell:b[3],def:b[4],
+    str:a[0],dex:a[1],vit:a[2],ene:a[3],
+    skills:{},specTree:null,items:[],eq:{},runes:[],minions:[],
+    pot:{hpS:5,mpS:5,hpM:1,mpM:1,hpL:0,mpL:0,hpX:0,mpX:0,town:2,idS:3},
+    buffs:{},shield:0,logs:[],auto:defAuto(),lastSave:Date.now()};
+}
+function saveAll(){try{localStorage.setItem(STORE,JSON.stringify({slots:slots,active:active}));return true}catch(e){return false}}
+function save(){if(active>=0&&S){S.lastSave=Date.now();slots[active]=JSON.parse(JSON.stringify(S))}return saveAll()}
+function migrateRunes(arr){
+  if(!arr)return[];
+  return arr.map(function(id){return RUNE_MIG[id]||id});
 }
 function load(){
-  let restored=false;
-  for(const key of [LS,BACKUP_LS]){
-    try{
-      const raw=localStorage.getItem(key);
-      if(!raw)continue;
-      const o=JSON.parse(raw);
-      if(validRoot(o)){root=o;restored=(key===BACKUP_LS);break;}
-    }catch(e){}
-  }
-  if(!root.personas['預設'])root.personas['預設']=defP();
-  if(!root.personas[root.active])root.active='預設';
-  cur=root.personas[root.active];
-  if(restored) setTimeout(()=>sys('主記憶資料無法讀取，已嘗試從本機備份恢復。請立即使用「匯出」另存備份。'),0);
-}
-function save(){
   try{
-    const next=JSON.stringify(root);
-    const old=localStorage.getItem(LS);
-    if(old){
-      try{JSON.parse(old);localStorage.setItem(BACKUP_LS,old)}catch(e){}
-    }
-    localStorage.setItem(LS,next);
-    return true;
-  }catch(e){
-    err('本機儲存失敗（可能容量不足或瀏覽器限制）。請立即按「匯出」備份資料；不要清除 Safari 網站資料。');
-    return false;
-  }
-}
-function switchP(n){if(!root.personas[n])return;root.active=n;cur=root.personas[n];save();rebuild();pUI();meta();pMeta();sys('切換到「'+n+'」');st('就緒','ok')}
-function createP(n){n=(n||'').trim();if(!n||root.personas[n]){alert(n?'已存在':'請輸入');return}root.personas[n]=defP();switchP(n);ok('已建立')}
-function pUI(){const s=$('personaSelect');s.innerHTML='';for(const n of Object.keys(root.personas)){const o=document.createElement('option');o.value=n;o.textContent=n;if(n===root.active)o.selected=true;s.appendChild(o)}const l=$('personaList');l.innerHTML='';for(const n of Object.keys(root.personas)){const c=document.createElement('span');c.className='persona-chip'+(n===root.active?' active':'');c.textContent=n;c.onclick=()=>switchP(n);l.appendChild(c)}}
-
-function rebuild(){bank=[];for(const i of Object.keys(cur.data||{}))for(const t of cur.data[i]||[])bank.push({text:t,intent:i,v:vec(t)});pairs=(cur.pairs||[]).map(p=>({q:p.q,a:p.a,qv:vec(p.q)}));buildI();buildM()}
-function buildI(){inv=new Map();for(let i=0;i<bank.length;i++){const ts=new Set(tok(bank[i].text));for(const t of ts){let s=inv.get(t);if(!s){s=new Set();inv.set(t,s)}s.add(i)}}}
-function buildM(){mk={bigram:{},trigram:{}};const all=bank.map(m=>m.text).concat(pairs.map(p=>p.a));for(const tx of all){const c=(tx||'').split('');for(let i=0;i<c.length-1;i++){const k=c[i];if(!mk.bigram[k])mk.bigram[k]=[];mk.bigram[k].push(c[i+1])}for(let i=0;i<c.length-2;i++){const k=c[i]+c[i+1];if(!mk.trigram[k])mk.trigram[k]=[];mk.trigram[k].push(c[i+2])}}}
-function gen(mode,seed,max=36){const m=mode==='trigram'?mk.trigram:mk.bigram;const ks=Object.keys(m);if(!ks.length)return null;let r=seed||ks[Math.floor(Math.random()*ks.length)];for(let i=0;i<max;i++){const k=mode==='trigram'?r.slice(-2):r.slice(-1);const ns=m[k];if(!ns?.length)break;r+=ns[Math.floor(Math.random()*ns.length)];if(/[。！？.!?]$/.test(r)&&r.length>8)break}return r.trim()}
-
-function addItems(items){let a=0,s=0;if(!cur.data)cur.data={};const ex={};for(const i of Object.keys(cur.data))ex[i]=new Set(cur.data[i]||[]);for(const it of items){if(!it.text||!it.intent)continue;if(!ex[it.intent])ex[it.intent]=new Set();if(ex[it.intent].has(it.text)){s++;continue}ex[it.intent].add(it.text);if(!cur.data[it.intent])cur.data[it.intent]=[];cur.data[it.intent].push(it.text);a++}return{a,s}}
-function addPair(q,a){if(!q||!a)return false;if(!cur.pairs)cur.pairs=[];if(cur.pairs.some(p=>p.q===q&&p.a===a))return false;cur.pairs.push({q,a});return true}
-
-function retP(q,k=5){const qv=vec(q);const sc=[];for(let i=0;i<pairs.length;i++){const s=dot(qv,pairs[i].qv);if(s>0)sc.push({i,score:s})}sc.sort((a,b)=>b.score-a.score);return sc.slice(0,k).map(s=>({...pairs[s.i],score:s.score}))}
-function ret(q,k=TOPK,ctx){const qv=vec(q);let fv=qv;if(ctx&&$('contextAware').checked){const cv=vec(ctx);fv=qv.map((x,i)=>x*(1-CTX)+cv[i]*CTX);let n=0;for(const x of fv)n+=x*x;n=Math.sqrt(n)||1;fv=fv.map(x=>x/n)}const ts=new Set(tok(q+(ctx||'')));const cand=new Set();for(const t of ts){const s=inv.get(t);if(s)for(const i of s)cand.add(i)}const pool=cand.size>=8?[...cand]:bank.map((_,i)=>i);const sc=[];for(const i of pool){let s=dot(fv,bank[i].v);const fb=(cur.feedback||{})[bank[i].intent+'|'+bank[i].text];if(fb){s+=(fb.up||0)*.04;s-=(fb.down||0)*.06}if(s>0)sc.push({i,score:s})}sc.sort((a,b)=>b.score-a.score);return sc.slice(0,k).map(s=>({...bank[s.i],score:s.score}))}
-function sourceQueryTerms(q){
-  const raw=String(q||'').toLowerCase().match(/[a-z][a-z0-9_+#.-]*|[\u4e00-\u9fff]+/g)||[];
-  const stop=new Set(['what','which','when','where','who','why','how','does','this','that','page','website','the','and','for','with','from','into','are','is','was','were','can','could','would','should','please','tell','explain','about','用途','目的','這個','網頁','網頁的','什麼','如何','為什麼','請問','請你','幫我','根據','原文','來源','回答','整理','說明','一下','可以','哪些','內容','頁面','網站']);
-  const out=[];
-  for(const t of raw){
-    if(/^[\u4e00-\u9fff]+$/.test(t)){
-      if(t.length===1)out.push(t);
-      else { for(let i=0;i<t.length-1;i++) out.push(t.slice(i,i+2)); if(t.length<=4)out.push(t); }
-    } else if(t.length>=2&&!stop.has(t)) out.push(t);
-  }
-  return [...new Set(out)].filter(t=>!stop.has(t));
-}
-function searchSourceKnowledge(q, limit=8){
-  const terms=sourceQueryTerms(q), rows=[];
-  for(const k of (Array.isArray(cur.knowledge)?cur.knowledge:[])) rows.push(k);
-  for(const src of (Array.isArray(cur.sources)?cur.sources:[])){
-    if(!src||!src.text)continue;
-    // Keep paragraph-sized evidence rather than relying on only a short generated knowledge sentence.
-    const paragraphs=String(src.text).split(/\n{1,}|(?<=[。！？.!?])\s+/).map(x=>x.trim()).filter(x=>x.length>=12&&x.length<=1400);
-    for(const text of paragraphs) rows.push({text,url:src.url,title:src.title,batchId:src.batchId,via:src.via,kind:'source_paragraph'});
-  }
-  const unique=new Map();
-  for(const k of rows){
-    const text=String(k.text||'').trim(); if(text.length<12)continue;
-    const title=String(k.title||'').toLowerCase(), url=String(k.url||'').toLowerCase(), hay=(title+' '+url+' '+text).toLowerCase();
-    let score=0, matched=0;
-    for(const term of terms){
-      if(term.length<2)continue;
-      let count=0, at=0; while((at=hay.indexOf(term,at))!==-1&&count<4){count++;at+=term.length;}
-      if(count){matched++;score+=Math.min(count,3)*(term.length>=4?1.25:0.65);if(title.includes(term))score+=1.8;if(url.includes(term))score+=0.4;}
-    }
-    // Questions about a page's purpose often use words absent from the original wording.
-    if(/用途|目的|用來做什麼|purpose|what.{0,12}(page|site|website).{0,12}(for|do)|what is this page/i.test(q)){
-      if(/documentation|examples?|demonstration|testing|permission|service|domain|示範|文件|教學|測試|服務|用途|目的/i.test(text))score+=1.2;
-    }
-    if(score>0){
-      const key=(url+'|'+text.toLowerCase().replace(/\s+/g,' ').trim());
-      const old=unique.get(key);if(!old||score>old.score)unique.set(key,{k,text,score,matched});
-    }
-  }
-  return [...unique.values()].sort((a,b)=>b.score-a.score||b.matched-a.matched).slice(0,limit);
-}
-function sourceGroundedAnswer(q){
-  const hits=searchSourceKnowledge(q,12);
-  if(!hits.length)return null;
-  const best=hits[0].score;
-  // Require actual query-term overlap; intent hints alone must not invent an answer.
-  if(best<1.35||hits[0].matched<1)return null;
-  const seen=new Set(), picked=[];
-  for(const h of hits){
-    const key=h.text.toLowerCase().replace(/\s+/g,' ').trim();
-    if(seen.has(key))continue;seen.add(key);picked.push(h);
-    if(picked.length>=4)break;
-  }
-  const lines=picked.map((h,i)=>`${i+1}. ${h.text}\n來源：${h.k.title||'未命名頁面'}\n網址：${h.k.url||'未記錄網址'}`);
-  return {reply:'我從已保存的來源中找到以下相關原文。先提供證據，不把推測冒充成原文答案：\n\n'+lines.join('\n\n')+'\n\n判讀方式：請看摘錄是否直接回答你的問題；如果只是相關內容，仍不能算已解答。這個版本使用關鍵詞與段落排序，尚不是大型語言模型的語意推理。',intent:'來源原文檢索',conf:Math.min(.88,.48+best*.045),low:false};
-}
-function ans(q,ctx){
-  // v24: Prefer source-linked knowledge records for questions about learned pages.
-  if(/學到|學習|來源|原文|網頁|用途|核心意思|根據.*(網頁|來源)|保存.*知識/.test(String(q||''))){
-    const grounded=sourceGroundedAnswer(q);
-    if(grounded)return grounded;
-  }
-  // v13: never randomly emit a retrieved sentence as if it were a complete answer.
-  if($('pairPriority').checked&&pairs.length){
-    const ph=retP(q);
-    if(ph[0]?.score>=Math.max(PMIN,0.82))return{reply:ph[0].a,intent:'已確認問答',conf:ph[0].score,low:false};
-  }
-  if(!bank.length&&!pairs.length)return{reply:'我目前沒有足夠的已保存知識。請先提供來源，或教我一組經確認的問答。',intent:'證據不足',conf:0,low:true};
-  const hits=ret(q,TOPK,ctx);
-  if(!hits.length||hits[0].score<Math.max(MIN,0.42)){
-    return{reply:'我目前找不到足夠可靠的內容直接回答這個問題。你可以提供更具體的關鍵詞或相關來源；我不會把隨機片段當成答案。',intent:'證據不足',conf:0.1,low:true};
-  }
-  const unique=[];
-  for(const h of hits){
-    const text=String(h.text||'').trim();
-    if(text && !unique.some(x=>x.text===text))unique.push({text,intent:h.intent,score:h.score});
-  }
-  if(!unique.length)return{reply:'找到的資料不足以形成可靠答案。',intent:'證據不足',conf:0.1,low:true};
-  return{reply:'我找到一些可能相關的記憶，但尚未確認它們能直接回答你的問題：\n\n'+unique.slice(0,3).map((x,i)=>`${i+1}. ${x.text}`).join('\n\n')+'\n\n請把以上視為候選資料，而非已驗證的完整答案。',intent:'候選資料',conf:Math.min(.6,unique[0].score||.2),low:true};
-}
-
-function normalizeUrl(raw, base){
-  try{const u=new URL(raw,base);if(!['http:','https:'].includes(u.protocol)||u.username||u.password)return null;u.hash='';return u.href}catch(e){return null}
-}
-function htmlToPage(raw, url){
-  // Jina may return readable Markdown/plain text rather than HTML.
-  if(!/<(?:html|body|article|main|p|div|h[1-6]|table|form|a)\b/i.test(raw)){
-    const title=(raw.match(/^(?:Title|標題):\s*(.+)$/mi)||[])[1]||url;
-    const links=[...raw.matchAll(/\[[^\]]{1,180}\]\((https?:\/\/[^)\s]+)\)/g)].map(m=>m[1]);
-    const cleaned=raw.replace(/^(?:Warning: This is a cached snapshot[\s\S]*?opt-out\.?\s*)/i,'').replace(/^\s*Title:\s*[^\n]+\n/i,'').trim();
-    return {title:title.slice(0,180),text:cleaned,links:[...new Set(links)],controls:[],html:false};
-  }
-  let doc;
-  try{doc=new DOMParser().parseFromString(raw,'text/html')}catch(e){return {title:extractTitle(raw)||url,text:clean(raw),links:[],controls:[],html:false}}
-  doc.querySelectorAll('script,style,noscript,svg,canvas,iframe,template,nav,footer,header,aside,[hidden],[aria-hidden="true"]').forEach(n=>n.remove());
-  const title=(doc.querySelector('meta[property="og:title"]')?.content||doc.querySelector('title')?.textContent||doc.querySelector('h1')?.textContent||url).trim().slice(0,180);
-  const parts=[];
-  const selectors='h1,h2,h3,h4,h5,h6,p,li,blockquote,td,th,caption,summary,dt,dd,pre,code,figcaption,article,main';
-  doc.querySelectorAll(selectors).forEach(n=>{
-    const t=(n.innerText||n.textContent||'').replace(/\s+/g,' ').trim();
-    if(t.length>=2 && t.length<=12000 && !parts.includes(t))parts.push(t);
-  });
-  // Capture forms and choices: labels, inputs, select options, buttons, accessible names.
-  const controls=[];
-  doc.querySelectorAll('form,select,option,input,textarea,button,[role="option"],[role="menuitem"],[aria-label],[title]').forEach(n=>{
-    const tag=n.tagName.toLowerCase(), label=(n.getAttribute('aria-label')||n.getAttribute('title')||n.getAttribute('placeholder')||n.labels?.[0]?.innerText||'').trim();
-    let val='';
-    if(tag==='option')val=(n.textContent||'').trim();
-    else if(tag==='select')val=[...n.options].map(o=>(o.textContent||'').trim()).filter(Boolean).join(' / ');
-    else if(tag==='input')val=[n.type,n.name,n.value].filter(Boolean).join(': ');
-    else if(tag==='textarea')val=[n.name,n.placeholder].filter(Boolean).join(': ');
-    else val=(n.innerText||n.textContent||'').trim();
-    const line=[tag,label,val].filter(Boolean).join(' — ').replace(/\s+/g,' ').trim();
-    if(line.length>1&&line.length<1200&&!controls.includes(line))controls.push(line);
-  });
-  const metas=[...doc.querySelectorAll('meta[name="description"],meta[property^="og:"],meta[name="keywords"]')]
-    .map(m=>[m.getAttribute('name')||m.getAttribute('property'),m.content].filter(Boolean).join(': ')).filter(Boolean);
-  const jsonld=[...doc.querySelectorAll('script[type="application/ld+json"]')].map(n=>n.textContent||'').filter(Boolean);
-  const text=[...metas,...parts,...controls,...jsonld.map(x=>'結構化資料：'+x.slice(0,8000))].join('\n').replace(/\n{3,}/g,'\n\n');
-  const links=[...doc.querySelectorAll('a[href]')].map(a=>normalizeUrl(a.getAttribute('href'),url)).filter(Boolean);
-  return {title,text,links:[...new Set(links)],controls,html:true};
-}
-async function fetchPage(url){
-  const normalized=normalizeUrl(url);
-  if(!normalized)return {error:'網址格式不正確，只接受 http 或 https。'};
-  const proxies=[
-    {name:'AllOrigins',url:`https://api.allorigins.win/raw?url=${encodeURIComponent(normalized)}`},
-    {name:'corsproxy.io',url:`https://corsproxy.io/?url=${encodeURIComponent(normalized)}`},
-    {name:'CodeTabs',url:`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(normalized)}`},
-    {name:'Jina Reader',url:`https://r.jina.ai/${normalized}`}
-  ];
-  const failures=[];
-  for(const proxy of proxies){
-    const c=new AbortController();const timer=setTimeout(()=>c.abort(),15000);
-    try{
-      const headers={'Accept':'text/html,text/plain,text/markdown,*/*'};if(proxy.name==='Jina Reader')headers['x-no-cache']='true';
-      const r=await fetch(proxy.url,{signal:c.signal,headers});
-      if(!r.ok){failures.push(proxy.name+': HTTP '+r.status);continue}
-      const txt=await r.text();
-      if(txt&&txt.length>80&&!/cloudflare ray id|access denied|enable javascript to continue|cached snapshot of the original page|consider retry with caching opt-out/i.test(txt.slice(0,5000))){
-        return {raw:txt,via:proxy.name,url:normalized};
-      }
-      failures.push(proxy.name+': 空白或封鎖頁面');
-    }catch(e){failures.push(proxy.name+': '+(e.name==='AbortError'?'逾時':'連線失敗'))}
-    finally{clearTimeout(timer)}
-  }
-  return {error:'所有讀取通道都失敗。常見原因：網站封鎖、需要登入、代理暫時故障或 iPhone 網路限制。嘗試開啟文章的公開版本，或改貼文章內頁網址。',details:failures.join('\n')};
-}
-function chunkText(text, max=220){
-  const out=[];
-  for(const para of String(text||'').split(/\n+/)){
-    const p=para.trim();if(!p)continue;
-    // Remove navigation-only/link-only fragments so they are not presented as knowledge.
-    if (/^(https?:\/\/|www\.)\S+$/i.test(p)) continue;
-    if (/^\(?\s*(org\/help\/|help\/|docs\/)[^\s)]*\)?$/i.test(p)) continue;
-    const sentences=p.split(/(?<=[。！？.!?；;])\s*/).map(x=>x.trim()).filter(Boolean);
-    for(const sent of sentences){
-      if (/^(https?:\/\/|www\.)\S+$/i.test(sent)) continue;
-      if (/^\(?\s*(org\/help\/|help\/|docs\/)[^\s)]*\)?$/i.test(sent)) continue;
-      if(sent.length<=max){if(sent.length>=2)out.push(sent);continue}
-      for(let i=0;i<sent.length;i+=max){const part=sent.slice(i,i+max).trim();if(part.length>=2)out.push(part)}
-    }
-  }
-  return out;
-}
-
-function linkPriority(href, baseUrl, rootUrl){
-  try{
-    const u=new URL(href,baseUrl), root=new URL(rootUrl);
-    const path=u.pathname.toLowerCase();
-    let score=0;
-    // Prefer pages in the same documentation/tutorial branch as the requested URL.
-    const rootParts=root.pathname.split('/').filter(Boolean);
-    const parts=u.pathname.split('/').filter(Boolean);
-    let common=0;while(common<rootParts.length&&common<parts.length&&rootParts[common]===parts[common])common++;
-    score+=common*4;
-    if(/\/tutorial(\/|$)/.test(path))score+=18;
-    if(/\/howto(\/|$)|\/guide(\/|$)|\/getting-started(\/|$)/.test(path))score+=8;
-    if(/\/reference(\/|$)|\/library\/index|\/extending(\/|$)|\/c-api(\/|$)|\/faq(\/|$)/.test(path))score-=12;
-    if(/\/index\.html?$/.test(path))score-=3;
-    if(/[?&](utm_|session|lang=)/i.test(u.search))score-=8;
-    if(u.hostname!==root.hostname)score-=100;
-    if(u.pathname===root.pathname)score-=100;
-    return score;
-  }catch(e){return -999}
-}
-function cleanKnowledgeLine(line){
-  let x=String(line||'').replace(/\s+/g,' ').trim();
-  if(x.length<35)return '';
-  if(/^(?:og:|description:|keywords:|結構化資料：|<script|<\/|https?:\/\/)/i.test(x))return '';
-  if(/^(?:skip to (?:content|main)|navigation menu|table of contents|previous topic|next topic|view page source|report an issue|edit on github|contents|索引|上一頁|下一頁|回到頂部)$/i.test(x))return '';
-  if(/^\{["'](?:@context|@type|name|url|description)["']\s*:/.test(x))return '';
-  return x;
-}
-function extractKnowledgeSentences(text){
-  const raw=String(text||'')
-    .replace(/https?:\/\/\S+/g,' ')
-    .replace(/[ \t]+/g,' ')
-    .split(/(?<=[.!?。！？；;])\s+|\n+/);
-  const seen=new Set(), out=[];
-  for(const part of raw){
-    let x=String(part||'').replace(/^\s*[•*\-]+\s*/,'').replace(/\s+/g,' ').trim();
-    if(x.length<14||x.length>420)continue;
-    if(/^(?:https?:\/\/|www\.|\/[^ ]+|[\w.-]+\.(?:html?|css|js|pdf)(?:\b|$))/i.test(x))continue;
-    if(/^(?:contents|table of contents|navigation|skip to content|edit on github|report an issue|copyright|all rights reserved|previous topic|next topic)$/i.test(x))continue;
-    if(/^\{.*(?:@context|@type|"url"\s*:).*\}$/.test(x))continue;
-    const key=x.toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
-    if(!key||seen.has(key))continue;
-    seen.add(key);out.push(x);
-  }
-  return out;
-}
-function scoreContentLine(line){
-  const x=cleanKnowledgeLine(line);if(!x)return -10;
-  let score=Math.min(5,x.length/100);
-  if(/[。！？.!?；;：:]/.test(x))score+=1;
-  if(/^(?:第?\d+[.)、]|[-*•]|[A-Z][A-Za-z ]{2,}:)/.test(x))score-=.5;
-  if(/cookie|privacy policy|terms of use|sign in|log in|subscribe|copyright|©\s*\d{4}|all rights reserved/i.test(x))score-=3;
-  if(/python documentation|python tutorial|language reference|standard library|navigation|table of contents/i.test(x))score-=1.5;
-  return score;
-}
-
-function crawlLinks(page, base, host){
-  return page.links.map(x=>normalizeUrl(x,base)).filter(Boolean).filter(x=>{
-    try{const u=new URL(x);return u.hostname===host&&!/\.(?:jpg|jpeg|png|gif|webp|svg|pdf|zip|mp4|mp3|css|js|ico)(?:$|\?)/i.test(u.pathname)}
-    catch(e){return false}
-  });
-}
-function sourceSearch(q, limit=6){
-  const query=String(q||'').toLowerCase().trim();if(!query)return (cur.sources||[]).slice(-limit).reverse();
-  const terms=[...new Set(tok(query).filter(x=>x.length>=1))];const scored=[];
-  for(const src of (cur.sources||[])){
-    const hay=(src.title+' '+src.url+' '+src.text).toLowerCase();let score=0;
-    if(src.title.toLowerCase().includes(query))score+=4;
-    if(src.url.toLowerCase().includes(query))score+=2;
-    for(const term of terms){if(hay.includes(term))score+=term.length>1?1.2:.3}
-    if(score>0)scored.push({src,score});
-  }
-  return scored.sort((a,b)=>b.score-a.score).slice(0,limit).map(x=>x.src);
-}
-function showSourceResults(q){
-  const box=$('sourceResults');box.style.display='block';
-  const results=sourceSearch(q,8);
-  if(!results.length){box.textContent='目前沒有找到符合的來源。請先讀取網址，或改用文章標題／網址中的關鍵字搜尋。';return}
-  box.replaceChildren();
-  for(const src of results){
-    const d=document.createElement('div');d.style.cssText='padding:10px 0;border-bottom:1px solid var(--line)';
-    const title=document.createElement('b');title.textContent=src.title||'未命名來源';d.appendChild(title);
-    const meta=document.createElement('div');meta.className='meta';meta.textContent=`${src.url}｜${src.pages||1} 頁｜${(src.text||'').length.toLocaleString()} 字元｜${src.fetchedAt||''}`;d.appendChild(meta);
-    const body=document.createElement('div');body.style.whiteSpace='pre-wrap';body.textContent=(src.text||'').slice(0,1600)+(src.text?.length>1600?'…':'');d.appendChild(body);
-    const b=document.createElement('button');b.className='ghost';b.textContent='用這篇來源回答問題';b.onclick=()=>{ $('input').value='請根據這個來源回答：'+(src.title||src.url)+'\n'+$('sourceSearch').value; $('input').focus(); };d.appendChild(b);box.appendChild(d);
-  }
-}
-async function deepLearnFromUrl(url, doLearn=true){
-  const first=normalizeUrl(url);
-  if(!first){err('請輸入有效的完整網址（https://...）。');return null}
-  $('progress').style.display='block';$('progBar').style.width='3%';$('learnResult').style.display='none';
-  st('準備讀取…','busy');
-  const maxPages=$('crawlScope').value==='none'?1:Math.max(1,Math.min(12,Number($('crawlPages').value)||5));
-  let queue=[first],seen=new Set(),pages=[],failed=[];
-  let rootHost='';try{rootHost=new URL(first).hostname}catch(e){}
-  while(queue.length&&pages.length<maxPages){
-    const target=queue.shift();if(seen.has(target))continue;seen.add(target);
-    st(`正在讀取第 ${pages.length+1} 頁（最多 ${maxPages} 頁）…`,'busy');
-    $('progBar').style.width=Math.min(90,5+Math.round((pages.length/maxPages)*80))+'%';
-    const fetched=await fetchPage(target);
-    if(fetched.error){failed.push(target+'：'+fetched.error);continue}
-    const page=htmlToPage(fetched.raw,target);
-    if(!page.text||page.text.trim().length<30){failed.push(target+'：讀到的正文太少');continue}
-    pages.push({url:target,title:page.title||target,text:page.text.slice(0,45000),controls:page.controls||[],via:fetched.via,links:page.links.length});
-    if(pages.length<maxPages&&$('crawlScope').value==='same'){
-      const prioritized=crawlLinks(page,target,rootHost).map(link=>({link,score:linkPriority(link,target,first)})).sort((a,b)=>b.score-a.score);for(const item of prioritized){const link=item.link;if(item.score>-20&&!seen.has(link)&&!queue.includes(link)&&queue.length<80)queue.push(link)}
-    }
-  }
-  if(!pages.length){
-    $('progress').style.display='none';st('讀取失敗');
-    err('無法讀取這個網址。\n'+(failed[0]||'網站可能封鎖讀取代理。')+'\n\n試試：直接貼文章內頁網址、確認不需登入、或改用公開可讀的文章頁。');
-    const box=$('learnResult');box.style.display='block';box.textContent=failed.slice(0,4).join('\n\n');
-    return null;
-  }
-  $('progBar').style.width='65%';
-  const baseTitle=pages[0].title||'網頁來源';
-  let intent=$('learnIntent').value.trim();
-  if(!intent&&$('autoIntent').checked)intent=baseTitle.slice(0,36).replace(/[^\u4e00-\u9fffa-zA-Z0-9 _-]/g,'').trim()||'web_'+Date.now().toString(36);
-  if(!intent)intent='web_learn';
-  const allItems=[],sourceRecords=[];
-  const batchId='learn_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7);
-  for(const pg of pages){
-    const chunks=chunkText(pg.text,220).filter(t=>t.length>=2);
-    for(const t of chunks)allItems.push({text:t,intent});
-    if($('learnStyle').checked){
-      for(const t of chunks.filter(x=>x.length>28&&x.length<150).slice(0,40))allItems.push({text:t,intent:intent+'_風格'});
-    }
-    sourceRecords.push({url:pg.url,title:pg.title,text:pg.text,controls:pg.controls,fetchedAt:new Date().toISOString(),via:pg.via,pages:1,batchId,verified:false});
-  }
-  const totalChars=pages.reduce((n,p)=>n+p.text.length,0);
-  const preview=`主頁：${baseTitle}\n意圖：${intent}\n成功讀取：${pages.length} 頁／目標最多 ${maxPages} 頁\n原文總量：約 ${totalChars.toLocaleString()} 字元\n知識片段：${allItems.length} 段\n讀取方式：${[...new Set(pages.map(p=>p.via))].join('、')}\n\n頁面清單：\n`+pages.map((p,i)=>`${i+1}. ${p.title}\n   ${p.url}\n   ${p.text.length.toLocaleString()} 字元｜連結 ${p.links} 個｜選項/控制項 ${p.controls.length} 個`).join('\n')+
-    (failed.length?`\n\n失敗/略過：${failed.length} 項\n${failed.slice(0,4).join('\n')}`:'')+
-    `\n\n原文摘錄：\n${pages[0].text.slice(0,1800)}`;
-  $('learnResult').style.display='block';$('learnResult').textContent=preview;
-  if(!doLearn){$('progBar').style.width='100%';st('預覽完成','ok');setTimeout(()=>$('progress').style.display='none',400);return{title:baseTitle,intent,pages,totalChars,failed}}
-  // v23: Keep source-linked knowledge separate from legacy intent/QA records.
-  if(!Array.isArray(cur.knowledge))cur.knowledge=[];
-  let knowledgeAdded=0, knowledgeDup=0;
-  for(const pg of pages){
-    const sentences=extractKnowledgeSentences(pg.text);
-    const controls=(pg.controls||[]).map(x=>'網頁控制項：'+String(x).trim()).filter(x=>x.length>14&&x.length<420);
-    const candidates=[...sentences,...controls];
-    for(const text of candidates){
-      const key=String(text).toLowerCase().replace(/\s+/g,' ').trim();
-      const exists=cur.knowledge.some(k=>String(k.text||'').toLowerCase().replace(/\s+/g,' ').trim()===key && k.url===pg.url);
-      if(exists){knowledgeDup++;continue;}
-      cur.knowledge.push({text:String(text).trim(),url:pg.url,title:pg.title||pg.url,batchId,via:pg.via,createdAt:new Date().toISOString(),kind:text.startsWith('網頁控制項：')?'control':'text'});
-      knowledgeAdded++;
-    }
-  }
-  // Bound local source-linked knowledge storage.
-  if(cur.knowledge.length>5000)cur.knowledge=cur.knowledge.slice(-5000);
-  const res=addItems(allItems);
-  if(!cur.sources)cur.sources=[];
-  for(const rec of sourceRecords){
-    const old=cur.sources.findIndex(x=>x.url===rec.url);
-    if(old>=0)cur.sources[old]=rec;else cur.sources.push(rec);
-  }
-  // Keep the source corpus bounded so localStorage does not grow without limit.
-  while(cur.sources.length>80 || cur.sources.reduce((n,x)=>n+String(x.text||'').length,0)>450000)cur.sources.shift();
-  // v11: Never turn arbitrary scraped fragments into question-answer pairs.
-  // Raw chunks remain searchable, but only explicitly reviewed pairs are treated as Q&A.
-
-  cur.lastLearnBatch=batchId;
-  const saved=save();rebuild();learned+=res.a;
-  $('progBar').style.width='100%';st(saved?'學習完成':'儲存失敗',saved?'ok':'');
-  meta();pMeta();showSourceResults('');
-  sys(`網址學習完成：${pages.length} 頁，原文約 ${totalChars.toLocaleString()} 字元，新增來源知識 ${knowledgeAdded} 段（來源知識重複 ${knowledgeDup} 段）；新增舊式索引項目 ${res.a} 段（重複 ${res.s} 段）。原文已保存到來源資料庫；讀取失敗 ${failed.length} 項。`);
-  ok(saved?`讀取 ${pages.length} 頁；來源知識新增 ${knowledgeAdded} 段，舊式索引新增 ${res.a} 段。請查看來源資料庫。`:'知識已整理，但本機儲存失敗，請立即匯出或減少來源數量。');
-  setTimeout(()=>$('progress').style.display='none',600);
-  return {title:baseTitle,intent,pages,totalChars,added:res.a,knowledgeAdded,knowledgeDup,failed};
-}
-
-function st(t,ty){const s=$('status');s.textContent=t;s.className='status'+(ty==='ok'?' ok':ty==='busy'?' busy':'')}
-function err(m){const e=$('errBox');e.style.display='block';e.textContent=m;setTimeout(()=>e.style.display='none',8e3)}
-function ok(m){const e=$('okBox');e.style.display='block';e.textContent=m;setTimeout(()=>e.style.display='none',4e3)}
-function sys(t){addMsg('sys',t)}
-function speak(t){if(!window.speechSynthesis)return;window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='zh-TW';u.rate=1.05;window.speechSynthesis.speak(u)}
-function addMsg(role,text,meta,opts){
-  const d=document.createElement('div');d.className='msg '+role;
-  if(meta){const t=document.createElement('span');t.className='tag';t.textContent=meta;d.appendChild(t)}
-  d.appendChild(document.createTextNode(text));
-  if(role==='ai'){
-    const fb=document.createElement('div');fb.className='fb';
-    [['👍','up'],['👎','dn'],['教它','te'],['🔊','sp']].forEach(([lab,k])=>{
-      const b=document.createElement('button');b.textContent=lab;
-      if(k==='up')b.onclick=()=>{if(!opts?.intent)return;if(!cur.feedback)cur.feedback={};const key=opts.intent+'|'+opts.text;if(!cur.feedback[key])cur.feedback[key]={up:0,down:0};cur.feedback[key].up++;save();ok('強化')};
-      if(k==='dn')b.onclick=()=>{if(!opts?.intent)return;if(!cur.feedback)cur.feedback={};const key=opts.intent+'|'+opts.text;if(!cur.feedback[key])cur.feedback[key]={up:0,down:0};cur.feedback[key].down++;save();ok('降低')};
-      if(k==='te')b.onclick=()=>{$('teachQuery').textContent='用戶：'+(lastU||'');$('teachModal').classList.add('show')};
-      if(k==='sp')b.onclick=()=>speak(text);
-      fb.appendChild(b);
+    var raw=localStorage.getItem(STORE);
+    if(raw){var d=JSON.parse(raw);if(d.slots){slots=d.slots;while(slots.length<2)slots.push(null);active=d.active!=null?d.active:-1}}
+    ["abyss_v09","abyss_v08"].forEach(function(k){
+      var old=localStorage.getItem(k);
+      if(old&&!slots.some(Boolean)){try{var x=JSON.parse(old);if(x.slots){slots=x.slots;saveAll()}else if(x.cid){slots=[x,null];saveAll()}}catch(e){}}
     });
-    d.appendChild(fb);
-  }
-  $('chat').appendChild(d);$('chat').scrollTop=$('chat').scrollHeight;
+  }catch(e){}
+  if(!Array.isArray(slots)||slots.length<2)slots=[null,null];
 }
-function saveH(){try{localStorage.setItem(LS+'_h_'+root.active,JSON.stringify(hist.slice(-200)))}catch(e){}}
-function loadH(){try{hist=JSON.parse(localStorage.getItem(LS+'_h_'+root.active)||'[]')}catch(e){hist=[]}}
-function meta(){let b=0;try{b=new Blob([localStorage.getItem(LS)||'']).size}catch(e){}$('bankInfo').textContent=bank.length+'句·'+pairs.length+'對';$('meta').textContent=`人格：${root.active}\n記憶 ${bank.length} 句 · 問答對 ${pairs.length}\n已用 ${(b/1024).toFixed(1)}KB · 累計學習 ${learned} 句`;$('urlMeta').textContent=`目前總記憶 ${bank.length} 句 · 問答對 ${pairs.length}`}
-function pMeta(){$('pairMeta').textContent=`目前 ${pairs.length} 組`}
+function log(msg,cls){if(!S)return;var t=new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit",second:"2-digit"});S.logs.unshift({t:t,msg:msg,cls:cls||""});S.logs=S.logs.slice(0,60);renderLog()}
+function renderLog(){var el=$("logBox");if(!el||!S)return;el.innerHTML=S.logs.map(function(x){return'<p><span class="t">['+x.t+']</span> <span class="'+(x.cls||'')+'">'+esc(x.msg)+'</span></p>'}).join("")}
 
-function initSpeech(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){$('mic').style.opacity=.4;return}recog=new SR();recog.lang='zh-TW';recog.interimResults=true;
-  recog.onstart=()=>{listen=true;$('mic').classList.add('listening');st('聆聽中','busy')};
-  recog.onend=()=>{listen=false;$('mic').classList.remove('listening');st('就緒','ok')};
-  recog.onerror=()=>{listen=false;$('mic').classList.remove('listening');st('就緒','ok')};
-  recog.onresult=e=>{let f='',i='';for(let x=e.resultIndex;x<e.results.length;x++){if(e.results[x].isFinal)f+=e.results[x][0].transcript;else i+=e.results[x][0].transcript}if(f){$('input').value=f;send()}else if(i)$('input').value=i}}
-function toggleMic(){if(!recog){err('請用 Chrome 才能語音');return}if(listen){recog.stop();return}try{recog.start()}catch(e){err('麥克風失敗')}}
-
-async function send(){
-  const text=$('input').value.trim();if(!text)return;
-  $('input').value='';$('input').style.height='auto';
-  addMsg('user',text);hist.push({role:'user',content:text});lastU=text;
-
-  if(/^https?:\/\/\S+$/i.test(text)){
-    sys('偵測到網址，開始瀏覽學習...');
-    $('learnUrl').value=text;
-    await deepLearnFromUrl(text,true);
-    saveH();return;
-  }
-  if(/^學[：:]\s*(https?:\/\/\S+)/i.test(text)){
-    const url=text.match(/https?:\/\/\S+/i)[0];
-    sys('開始學習此網址...');
-    $('learnUrl').value=url;
-    await deepLearnFromUrl(url,true);
-    saveH();return;
-  }
-
-  await sleep(30);
-  let ctx='';if($('contextAware').checked)ctx=hist.filter(h=>h.role==='user'||h.role==='ai').slice(-5).map(h=>h.content).join(' ');
-  let r=ans(text,ctx);
-  const qnorm=text.toLowerCase();
-  const isSourceInventory=/(列出|顯示|查找|找出|查看).{0,18}(本次|這次|最新|剛才|保存|學習批次|來源|學習紀錄)|(本次|這次|最新|剛才).{0,18}(批次識別碼|學習批次|所有來源|來源網址|學習紀錄)/.test(text);
-  const isMemoryAudit=/(重新整理|重新開啟|本機保存|已保存的資料|持久記憶|不要重新瀏覽).{0,30}(來源|紀錄|批次|原文|知識|記憶)/.test(text);
-  const isSummary=/(學到什麼|學了什麼|學習成果|學習報告|總結|摘要|整理重點|讀了什麼)/.test(text);
-  const isVague=/(回答什麼|你會什麼|說說看|怎麼樣\s*[?？]?)/.test(text);
-  const allSources=(cur.sources||[]).filter(x=>x&&x.text);
-  const currentBatch=cur.lastLearnBatch;
-  const currentSources=currentBatch?allSources.filter(x=>x.batchId===currentBatch):[];
-  const sources=currentSources;
-  const asksReturnPrint=/(return.{0,30}print|print.{0,30}return)/i.test(text) || (text.includes('return')&&text.includes('print')&&/(不同|差別|比較|difference|vs\.?)/i.test(text));
-  const asksCodingCapability=/(幫我|幫你|能不能|可以).{0,12}(寫|製作|修改|除錯|修復).{0,12}(遊戲|程式|程式碼|網頁|app|專案)/i.test(text) || /(你會不會|你能否).{0,15}(寫程式|寫遊戲|除錯|修改程式)/i.test(text);
-  if(r.intent==='來源原文檢索'){
-    // Keep the improved source-grounded retrieval result; later fallback branches must not overwrite it.
-  } else if(asksCodingCapability){
-    r={reply:'我可以協助規劃、撰寫和修改程式碼，也能根據你提供的錯誤訊息分析問題。不過，這個版本尚未連接真正的語言模型，也沒有內建可靠的程式執行沙箱，因此不能誠實宣稱能獨立完成任意專案或已經測試通過。\n\n目前可做：\n• 根據明確需求產生程式碼草稿。\n• 搜尋已保存來源，引用找到的技術文件。\n• 依你提供的測試結果修正程式。\n\n尚需升級：語言模型推理、檔案級專案分析、程式執行與自動化測試。',intent:'能力說明',conf:.95,low:false};
-  } else if(asksReturnPrint){
-    r={reply:'基本程式知識（不是這次網頁學習的證據）：\n\n• `print(...)`：把資訊輸出到終端機或標準輸出，主要用來顯示內容。\n• `return`：在函式內把值交還給呼叫端；執行 `return` 時，該次函式執行會結束。\n• 例子：`def add(a, b): return a + b` 會回傳加總結果；`print(add(2, 3))` 才會把結果顯示出來。\n\n來源狀態：這是內建基礎知識說明，不代表我已在剛才讀取的網頁中找到這個答案。若你要求只根據來源回答，請以來源中實際包含的內容為準。',intent:'內建基礎知識',conf:.7,low:false};
-  } else if(isSourceInventory || isMemoryAudit){
-    const stored=(cur.sources||[]).filter(x=>x&&x.url&&x.text);
-    const batch=currentBatch ? stored.filter(x=>x.batchId===currentBatch) : [];
-    const asksStrictCurrent=/(本次|這次|剛才|上一輪|同一批|最新).{0,24}(學習|批次|來源|紀錄|原文|記憶)|(學習|批次|來源|紀錄|原文|記憶).{0,24}(本次|這次|剛才|上一輪|同一批|最新)/.test(text);
-    // Strict audit: if the user asks for the current/previous batch, never substitute unrelated historical sources.
-    const list=asksStrictCurrent ? batch : (batch.length ? batch : stored.slice().sort((a,b)=>String(b.fetchedAt||'').localeCompare(String(a.fetchedAt||''))).slice(0,20));
-    if(list.length){
-      const batchStatus=batch.length
-        ? `目前批次識別碼：${currentBatch}\n符合本次批次的來源：${batch.length} 篇。`
-        : `本機來源清單：${list.length} 篇。以下不是經批次識別碼確認的本次學習來源。`;
-      r={reply:`${batchStatus}\n\n${list.map((src,i)=>`${i+1}. ${src.title||'未命名來源'}\n網址：${src.url}\n擷取時間：${src.fetchedAt||'未記錄'}\n擷取方式：${src.via||'未記錄'}\n保存字元數：${String(src.text||'').length}\n批次標記：${src.batchId||'缺失'}`).join('\n\n')}\n\n記憶核驗：這份清單來自目前 persona 的本機來源資料。若批次標記缺失或批次識別碼不匹配，我不會假稱已找回指定批次。`,intent:'來源資料清單',conf:1,low:false};
-    } else {
-      r={reply:asksStrictCurrent
-        ? '我無法在目前 persona 的本機資料中，找到可由批次識別碼確認的這次學習來源。我不會用舊來源冒充本次結果。可能原因：本次學習未成功保存、重新整理後批次識別碼沒有持久保存、切換了 persona，或瀏覽器清除了本機資料。請回到同一 persona 檢查來源資料庫；若仍找不到，這項記憶測試判定為失敗。'
-        : '我在目前 persona 的本機來源資料庫中沒有找到可列出的已保存網頁來源。這表示來源可能未成功保存、目前切換到不同 persona，或瀏覽器儲存資料已遺失。我不能聲稱已記住這次學習。請確認學習完成時有顯示「原文已保存」，並在同一個 persona 下測試。',
-        intent:'來源資料核驗',conf:1,low:false};
+function itemDesc(it){
+  if(!it.id_ed)return"【未鑑定】";
+  var a=[];if(it.req)a.push("需求等級 "+it.req);
+  if(it.bs)Object.keys(it.bs).forEach(function(k){if(it.bs[k])a.push(fmtAffix(k,it.bs[k]))});
+  if(it.mods)Object.keys(it.mods).forEach(function(k){if(it.mods[k])a.push(fmtAffix(k,it.mods[k]))});
+  if(it.sock)a.push("凹槽 "+(it.filled?it.filled.length:0)+"/"+it.sock);
+  if(it.set)a.push("套裝："+it.set);
+  if(it.rw)a.push("符文之語："+it.rw);
+  if(it.unique&&it.desc)a.push("「"+it.desc+"」");
+  return a.join(" · ")||"—";
+}
+function itemName(it){
+  if(!it.id_ed)return"未鑑定的"+it.slot;
+  if(it.rw)return it.rw;
+  var n=it.name;
+  if(it.filled&&it.filled.length)n+=" ["+it.filled.join("+")+"]";
+  return n;
+}
+function getSkill(key){if(!S)return null;var list=buildSkills(S.cid);for(var i=0;i<list.length;i++)if(list[i].key===key)return list[i];return null}
+function mods(){
+  var m={atk:0,spell:0,def:0,hp:0,mp:0,str:0,dex:0,fire:0,cold:0,light:0,res:0,atkPct:0,spellPct:0,defPct:0,hpPct:0,mpPct:0,firePct:0,coldPct:0,lightPct:0,lifeRegen:0,lifeSteal:0,summonAtk:0,summonHp:0,summonCap:0,fireRes:0,coldRes:0,lightRes:0,poisonRes:0,curseRes:0};
+  if(!S)return m;
+  Object.keys(S.eq).forEach(function(slot){
+    var id=S.eq[slot],it=null;
+    for(var i=0;i<S.items.length;i++)if(S.items[i].id===id){it=S.items[i];break}
+    if(!it||!it.id_ed)return;
+    if(it.bs)Object.keys(it.bs).forEach(function(k){m[k]=(m[k]||0)+it.bs[k]});
+    if(it.mods)Object.keys(it.mods).forEach(function(k){m[k]=(m[k]||0)+it.mods[k]});
+    if(it.rwMods)Object.keys(it.rwMods).forEach(function(k){m[k]=(m[k]||0)+it.rwMods[k]});
+    if(it.sock&&it.filled&&!it.rw){
+      it.filled.forEach(function(rid){
+        for(var j=0;j<RUNES.length;j++)if(RUNES[j].id===rid)Object.keys(RUNES[j].m).forEach(function(k){m[k]=(m[k]||0)+RUNES[j].m[k]});
+      });
     }
-  } else if(isSummary){
-    const latest=[...currentSources].sort((a,b)=>String(a.url||'').localeCompare(String(b.url||'')));
-    if(latest.length){
-      const report=latest.map((src,i)=>{
-        const lines=extractKnowledgeSentences(src.text).map(line=>({line,score:scoreContentLine(line)||Math.min(4,line.length/80)})).filter(x=>x.line&&x.score>0.15);
-        const picks=[]; const seen=new Set();
-        for(const item of lines.sort((a,b)=>b.score-a.score)){
-          const line=item.line;
-          const key=line.toLowerCase().replace(/\s+/g,' ').slice(0,100);
-          if(!seen.has(key)){seen.add(key);picks.push(line)}
-          if(picks.length>=5)break;
-        }
-        return `${i+1}. ${src.title||'未命名來源'}\n網址：${src.url}\n擷取時間：${src.fetchedAt||'未知'}\n擷取方式：${src.via||'未記錄'}\n原文保存字元數：${String(src.text||'').length}\n可辨識的正文摘錄（已略過部分單獨連結；不是全文）：\n${picks.map(x=>'• '+x).join('\n')||'未擷取到足夠正文'}`;
-      }).join('\n\n');
-      r={reply:`本次學習批次識別碼：${currentBatch}\n本次保存來源：${latest.length} 篇。以下逐篇列出本次批次來源與原文摘錄；摘錄不等於全文理解，也不代表所有連結或互動內容都已讀取。\n\n${report}\n\n品質聲明：目前這是以原文為依據的規則式整理，不是語言模型完成的語意總結。請以每篇的網址、擷取方式和保存字元數核對來源；如有來源不符，代表採集或批次追蹤仍需修正。`,intent:'學習報告',conf:.7,low:false};
-    } else r={reply:'我目前找不到已保存的網頁來源，所以無法可靠地總結學習成果。請先讀取一篇網址，再回來問我。',intent:'學習報告',conf:.0,low:true};
-  } else if(isVague){
-    r={reply:'我需要知道你希望我回答哪一個問題。你可以問：「這篇文章的三個重點是什麼？」或「請解釋其中的某個概念」。如果你是在問我剛剛學到什麼，請直接說「整理學習報告」。',intent:'澄清問題',conf:.9,low:false};
-  } else if(sources.length){
-    // Rank evidence by meaningful query terms; never select a source merely because a generic word matches.
-    const stop=new Set(['請','幫我','說明','解釋','什麼','如何','怎麼','為什麼','這個','那個','內容','來源','根據','回答','告訴','一下','可以','是否','請問','整理','以及','並且','的','了','是','有','和','與','在','中','a','an','the','is','are','what','how','why','please','explain','tell','about','python','javascript','guide','tutorial','library','standard','language','reference']);
-    const rawTerms=text.toLowerCase().match(/[a-z][a-z0-9_+#.-]{1,}|[\u4e00-\u9fff]{2,}/g)||[];
-    const terms=[...new Set(rawTerms.flatMap(t=>{if(/^[\u4e00-\u9fff]+$/.test(t)){const a=[];for(let i=0;i<t.length-1;i++)a.push(t.slice(i,i+2));if(t.length<=4)a.push(t);return a}return [t]}).filter(t=>!stop.has(t)&&t.length>1))];
-    const ranked=sources.map(src=>{
-      const title=(src.title||'').toLowerCase(), body=(src.text||'').toLowerCase();
-      let score=0, hits=0;
-      for(const term of terms){let n=0, pos=0;while((pos=body.indexOf(term,pos))>=0&&n<4){n++;pos+=term.length} if(n){hits++;score+=Math.min(n,3)*(term.length>2?1:0.5);if(title.includes(term))score+=2}}
-      return {src,score,hits};
-    }).sort((x,y)=>y.score-x.score);
-    const best=ranked[0];
-    const requiredHits=terms.length<=1?1:Math.min(2,terms.length);
-    if(best&&best.score>=3.5&&best.hits>=requiredHits){
-      const chunks=chunkText(best.src.text,280);
-      const excerpts=chunks.map(chunk=>({chunk,score:terms.reduce((n,t)=>n+(chunk.toLowerCase().includes(t)?1:0),0)}))
-        .filter(x=>x.score>=Math.min(2,Math.max(1,terms.length)))
-        .sort((x,y)=>y.score-x.score).slice(0,4);
-      if(excerpts.length){
-        r={reply:`我在已保存來源「${best.src.title||'未命名來源'}」中找到可能相關的原文摘錄：\n\n${excerpts.map((x,i)=>`${i+1}. ${x.chunk}`).join('\n\n')}\n\n來源：${best.src.url}\n\n判定：這是來源摘錄，不是經語言模型整合的最終答案。請核對摘錄是否直接回答問題；若沒有直接證據，不能視為已解答。`,intent:'來源摘錄',conf:Math.min(.7,.25+best.score*.025),low:true};
-      } else {
-        r={reply:'我找到的頁面可能談到相近主題，但沒有找到同時包含足夠問題關鍵詞的原文段落，因此不能可靠回答。請讓我讀取更具體的章節或來源。',intent:'證據不足',conf:.1,low:true};
+  });
+  Object.keys(S.skills).forEach(function(k){
+    var n=S.skills[k];if(!n)return;var sk=getSkill(k);if(!sk||sk.t!=="passive")return;
+    if(sk.atkPct)m.atkPct+=sk.atkPct*n;if(sk.spellPct)m.spellPct+=sk.spellPct*n;
+    if(sk.defPct)m.defPct+=sk.defPct*n;if(sk.hpPct)m.hpPct+=sk.hpPct*n;
+    if(sk.ls)m.lifeSteal+=sk.ls*n;if(sk.res)m.res+=sk.res*n;
+    if(sk.sumAtk)m.summonAtk+=sk.sumAtk*n;if(sk.sumHp)m.summonHp+=sk.sumHp*n;if(sk.sumCap)m.summonCap+=sk.sumCap*n;
+  });
+  return m;
+}
+function tot(){
+  var m=mods();
+  var sb=Math.floor((S.str+m.str)*0.4),db=Math.floor((S.dex+m.dex)*0.3),vb=Math.floor(S.vit*0.8),eb=Math.floor(S.ene*0.6);
+  var atk=S.atk+Math.floor(S.lv*1.2)+m.atk+sb+Math.floor((S.atk+m.atk+sb)*m.atkPct/100);
+  var def=S.def+Math.floor(S.lv*0.6)+m.def+Math.floor(db*0.5)+Math.floor((S.def+m.def)*m.defPct/100);
+  if(S.buffs&&S.buffs.atk)atk=Math.floor(atk*(1+S.buffs.atk));
+  if(S.buffs&&S.buffs.def)def=Math.floor(def*(1+S.buffs.def));
+  return{m:m,a:atk,sp:S.spell+Math.floor(S.lv*0.9)+m.spell+eb+Math.floor((S.spell+m.spell+eb)*m.spellPct/100),d:def,
+    hp:S.mhp+m.hp+vb+Math.floor(S.mhp*m.hpPct/100),mp:S.mmp+m.mp+eb+Math.floor(S.mmp*m.mpPct/100)};
+}
+function needXp(){return Math.floor(40*Math.pow(S.lv,1.42))}
+function levelUp(){
+  while(S.xp>=needXp()&&S.lv<MAX_LV){
+    S.xp-=needXp();S.lv++;S.sp++;S.ap++;
+    S.mhp+=3;S.mmp+=2;S.atk++;S.spell++;S.def++;
+    var t=tot();S.hp=t.hp;S.mp=t.mp;
+    log("升級！Lv."+S.lv+" 技能點+1 屬性點+1","sys");
+  }
+  if(S.lv>=MAX_LV)S.xp=0;
+}
+
+/* 怪物詞綴規則 */
+function shouldAffix(rank){
+  if(S.diff===2)return true;
+  if(S.diff===1)return rank!=="normal";
+  return rank==="boss"||rank==="unique";
+}
+function applyAffixes(en,rank){
+  if(!shouldAffix(rank))return en;
+  var count=1;
+  if(S.diff===2){
+    if(rank==="unique"||rank==="boss")count=rnd(3,5);
+    else if(rank==="champ")count=rnd(2,3);
+    else count=rnd(1,2);
+  }else if(S.diff===1){
+    if(rank==="unique"||rank==="boss")count=rnd(2,3);
+    else count=1;
+  }else{
+    count=rank==="unique"?rnd(2,3):1;
+  }
+  en.affixes=[];en.ele=null;en.elePct=0;en.res={};
+  var used={};
+  for(var i=0;i<count;i++){
+    var a=pick(MOB_AFFIXES);
+    if(used[a.n])continue;used[a.n]=1;
+    en.affixes.push(a.n);
+    if(a.atkM)en.atk=Math.floor(en.atk*a.atkM);
+    if(a.hpM){en.hp=Math.floor(en.hp*a.hpM);en.max=en.hp}
+    if(a.defM)en.def=Math.floor(en.def*a.defM);
+    if(a.ele){en.ele=a.ele;en.elePct=(en.elePct||0)+(a.elePct||0)}
+    if(a.res)Object.keys(a.res).forEach(function(k){en.res[k]=(en.res[k]||0)+a.res[k]});
+    if(a.lootM)en.loot=(en.loot||1)*a.lootM;
+  }
+  if(S.diff===2){
+    en.res.fire=(en.res.fire||0)+25;en.res.cold=(en.res.cold||0)+25;
+    en.res.light=(en.res.light||0)+25;en.res.poison=(en.res.poison||0)+20;
+    en.res.curse=(en.res.curse||0)+20;
+  }
+  if(en.affixes.length)en.name=en.affixes.join("")+"的"+en.name;
+  return en;
+}
+function makeOneEnemy(name,rank,lv){
+  var dm=DIFF[S.diff][1],xm=DIFF[S.diff][2];
+  var mult=rank==="unique"?4.5:rank==="boss"?3.2:rank==="champ"?1.7:1;
+  var h=Math.floor((22+lv*11)*dm*mult);
+  var en={name:name,rank:rank,lv:lv,hp:h,max:h,
+    atk:Math.floor((4+lv*2.3)*dm*(rank==="unique"?2:rank==="boss"?1.7:rank==="champ"?1.25:1)),
+    def:Math.floor((1+lv*0.65)*dm),
+    xp:Math.floor((9+lv*3.5)*xm*(rank==="unique"?12:rank==="boss"?8:rank==="champ"?2.2:1)),
+    gold:Math.floor((3+lv*1.8)*dm*(rank==="unique"?10:rank==="boss"?6:rank==="champ"?1.8:1)),
+    loot:(rank==="unique"?3:rank==="boss"?2:rank==="champ"?1.3:1),
+    defDown:0,atkDown:0,dot:0,dotDur:0,ele:null,elePct:0,res:{},affixes:[]};
+  return applyAffixes(en,rank);
+}
+function genPack(){
+  var z=ZONES[Math.min(S.zone,ZONES.length-1)];
+  var lv=S.lv+Math.floor(S.kills/15)+S.zone*2;
+  var list=[];
+  if(z.unique){
+    var bossName=pick(z.bosses);
+    list.push(makeOneEnemy(bossName,"unique",lv+5));
+    for(var i=0;i<7;i++)list.push(makeOneEnemy(pick(z.bosses),"boss",lv+2));
+  }else{
+    var roll=Math.random();
+    var isUniqueBoss=roll<0.03||S.kills%40===39;
+    var isBoss=!isUniqueBoss&&(roll<0.08||S.kills%25===24);
+    var isChamp=!isUniqueBoss&&!isBoss&&roll<0.18;
+    if(isUniqueBoss){
+      list.push(makeOneEnemy(z.boss,"unique",lv+4));
+      for(var j=0;j<7;j++)list.push(makeOneEnemy(z.boss,"boss",lv+1));
+    }else if(isBoss){
+      list.push(makeOneEnemy(z.boss,"boss",lv+2));
+      for(var k=0;k<7;k++)list.push(makeOneEnemy(pick(z.mobs),"normal",lv));
+    }else if(isChamp){
+      list.push(makeOneEnemy(pick(z.champ),"champ",lv+1));
+      for(var m=0;m<7;m++)list.push(makeOneEnemy(pick(z.mobs),"normal",lv));
+    }else{
+      var cnt=rnd(1,Math.min(8,2+Math.floor(S.diff*2)));
+      for(var n=0;n<cnt;n++)list.push(makeOneEnemy(pick(z.mobs),"normal",lv));
+    }
+  }
+  return list.slice(0,8);
+}
+
+function playerRes(ele){
+  var m=mods();
+  var base=m.res||0;
+  if(ele==="fire")return Math.min(75,base+(m.fireRes||0));
+  if(ele==="cold")return Math.min(75,base+(m.coldRes||0));
+  if(ele==="light")return Math.min(75,base+(m.lightRes||0));
+  if(ele==="poison")return Math.min(75,base+(m.poisonRes||0));
+  if(ele==="curse")return Math.min(75,base+(m.curseRes||0));
+  return Math.min(75,base);
+}
+function eleName(e){return{fire:"火焰",cold:"冰冷",light:"閃電",poison:"毒素",curse:"詛咒"}[e]||""}
+
+/* 戰鬥：多怪 */
+function fight(skillKey){
+  if(!S)return;
+  if(!pack.length||pack.every(function(e){return e.hp<=0}))pack=genPack();
+  var t=tot();
+  var sk=skillKey?getSkill(skillKey):null;
+  if(sk&&!(S.skills[skillKey]>0))sk=null;
+  if(sk&&sk.t==="passive"){log("被動已常駐","sys");return}
+  var cost=0;
+  if(sk){
+    if(sk.t==="spell"||sk.t==="dot"||sk.t==="control")cost=Math.max(3,4+(S.skills[skillKey]||1)*2);
+    else if(sk.t==="summon")cost=5+(S.skills[skillKey]||1);
+    else cost=3;
+  }
+  if(cost>S.mp){log("魔力不足","warn");return}
+  S.mp-=cost;
+
+  var alive=pack.filter(function(e){return e.hp>0});
+  if(!alive.length){pack=genPack();alive=pack}
+
+  var target=alive[0];
+  var dmg=0,mul=(sk&&sk.mul)?sk.mul:1,hits=(sk&&sk.hits)?sk.hits:1;
+  var baseAtk=(sk&&(sk.t==="spell"||sk.t==="dot"||sk.t==="control"))?t.sp:t.a;
+  var eDef=target.def*(1-(target.defDown||0));
+  dmg=Math.max(1,Math.floor(baseAtk*mul-eDef*0.4+rnd(0,3)));
+
+  if(sk){
+    if(sk.t==="summon"&&sk.min){addMinion(sk.min,S.skills[skillKey]||1);dmg=0}
+    else if(sk.armyBurst){var total=0;S.minions.forEach(function(mn){var md=Math.floor(mn.atk*sk.armyBurst);total+=md;target.hp-=md});log("軍團爆發 "+total,"sum");dmg=0}
+    else if(sk.t==="heal"){if(sk.healPct)S.hp=Math.min(t.hp,S.hp+Math.floor(t.hp*sk.healPct));if(sk.mpPct)S.mp=Math.min(t.mp,S.mp+Math.floor(t.mp*sk.mpPct));if(sk.shieldPct)S.shield=Math.floor(t.hp*sk.shieldPct);log("回復","heal");dmg=0}
+    else if(sk.t==="shield"){S.shield=Math.floor(t.hp*(sk.shieldPct||0.2));log("護盾 "+S.shield,"sys");dmg=0}
+    else if(sk.t==="buff"){if(!S.buffs)S.buffs={};if(sk.atkBuff){S.buffs.atk=sk.atkBuff;S.buffs.atk_dur=sk.dur||3}if(sk.defBuff){S.buffs.def=sk.defBuff;S.buffs.def_dur=sk.dur||3};log(sk.n+" 生效","sys");if(!sk.mul)dmg=0}
+    else if(sk.t==="debuff"||sk.t==="control"){if(sk.defDown)target.defDown=Math.max(target.defDown||0,sk.defDown);if(sk.atkDown)target.atkDown=Math.max(target.atkDown||0,sk.atkDown);log(sk.n+" 施加","sys")}
+    else if(sk.t==="dot"){if(sk.dot){target.dot=Math.max(target.dot||0,sk.dot);target.dotDur=Math.max(target.dotDur||0,sk.dotDur||3)}log(sk.n+" 附加","warn")}
+    if(sk.vamp&&dmg>0){var heal=Math.floor(dmg*sk.vamp);S.hp=Math.min(t.hp,S.hp+heal);log("汲取 "+heal,"heal")}
+    if(sk.dotBonus&&target.dot)dmg=Math.floor(dmg*(1+sk.dotBonus));
+  }
+  if(dmg>0){
+    for(var h=0;h<hits;h++){var hd=h===0?dmg:Math.max(1,Math.floor(baseAtk*mul-eDef*0.4+rnd(0,2)));target.hp-=hd;log((sk?sk.n:"攻擊")+" → "+target.name+" "+hd,"dmg")}
+    if(t.m.lifeSteal)S.hp=Math.min(t.hp,S.hp+Math.floor(dmg*t.m.lifeSteal/100));
+  }
+  S.minions.forEach(function(mn){
+    if(target.hp<=0){alive=pack.filter(function(e){return e.hp>0});if(alive.length)target=alive[0];else return}
+    var md=Math.max(1,Math.floor(mn.atk-target.def*0.2+rnd(0,2)));target.hp-=md;log(mn.name+" → "+target.name+" "+md,"sum");
+  });
+  pack.forEach(function(e){if(e.hp>0&&e.dot&&e.dotDur>0){var dd=Math.max(1,Math.floor(e.max*e.dot));e.hp-=dd;e.dotDur--;log(e.name+" 持續傷害 "+dd,"warn")}});
+
+  var killed=pack.filter(function(e){return e.hp<=0&&!e._scored});
+  killed.forEach(function(e){
+    e._scored=true;S.kills++;if(e.rank==="boss"||e.rank==="unique")S.boss++;
+    S.xp+=e.xp;S.gold+=e.gold;
+    log("擊敗"+(e.rank==="unique"?"獨特":e.rank==="boss"?"首領":e.rank==="champ"?"精英":"")+e.name+" +"+e.xp+"經驗 +"+e.gold+"金","sys");
+    var ch=e.rank==="unique"?0.7:e.rank==="boss"?0.5:e.rank==="champ"?0.28:0.1;
+    if(Math.random()<Math.min(0.75,ch*(e.loot||1)))handleLoot(makeItem(e.rank==="unique"?5:e.rank==="boss"?4:e.rank==="champ"?2:0,e.rank==="unique"&&Math.random()<0.12));
+    if((e.rank==="boss"||e.rank==="unique")&&Math.random()<0.2){var maxT=Math.min(10,Math.floor(S.lv/5)+1);var pool=RUNES.filter(function(r){return r.t<=maxT});var rn=pick(pool);S.runes.push(rn.id);log("符文："+rn.n,"drop")}
+    if((e.rank==="boss"||e.rank==="unique"||e.rank==="champ")&&Math.random()<0.12){var dp=pick(DROP_POT);S.pot[dp.id]=(S.pot[dp.id]||0)+1;log("掉落 "+dp.n,"drop")}
+  });
+  if(pack.every(function(e){return e.hp<=0})){
+    S.hp=Math.min(tot().hp,S.hp+Math.floor(tot().hp*0.05));
+    S.mp=Math.min(tot().mp,S.mp+Math.floor(tot().mp*0.03));
+    if(t.m.lifeRegen)S.hp=Math.min(tot().hp,S.hp+t.m.lifeRegen);
+    levelUp();pack=[];
+  }else{
+    /* 所有存活怪物攻擊玩家 */
+    var attackers=pack.filter(function(e){return e.hp>0}).slice(0,8);
+    attackers.forEach(function(en){
+      var raw=Math.max(1,en.atk*(1-(en.atkDown||0))-t.d*0.5+rnd(0,3));
+      var eleDmg=0,eleLabel="";
+      if(en.ele&&en.elePct){
+        eleDmg=Math.floor(raw*en.elePct);
+        var r=playerRes(en.ele);
+        eleDmg=Math.floor(eleDmg*(1-r/100));
+        eleLabel=eleName(en.ele);
+        raw=Math.floor(raw*(1-en.elePct));
       }
-    } else {
-      r={reply:'我在已保存的來源中，沒有找到足夠直接回答這個問題的內容。為避免亂答，請提供更具體的關鍵詞，或讓我學習相關頁面。',intent:'證據不足',conf:.1,low:true};
+      var phys=Math.max(0,raw);
+      var totalD=phys+eleDmg;
+      var tanks=S.minions.filter(function(m){return m.tank&&m.hp>0});
+      var allm=S.minions.filter(function(m){return m.hp>0});
+      if(tanks.length||allm.length){
+        var mn=pick(tanks.length?tanks:allm);
+        var md=Math.max(1,Math.floor(totalD*(mn.tank?0.8:1)));
+        mn.hp-=md;
+        log(en.name+(eleLabel?"（"+eleLabel+"）":"")+" → "+mn.name+" "+md,"warn");
+        if(mn.hp<=0){log(mn.name+" 陣亡","warn");S.minions=S.minions.filter(function(x){return x!==mn})}
+      }else{
+        if(S.shield>0){var ab=Math.min(S.shield,totalD);S.shield-=ab;totalD-=ab;if(S.shield<=0)log("護盾破碎","warn")}
+        if(totalD>0){
+          S.hp-=totalD;
+          log(en.name+(eleLabel?"（"+eleLabel+"）":"")+" → 你 "+totalD+(eleLabel?" [抗性已計]":""),"ele");
+        }
+      }
+    });
+    if(S.hp<=0){
+      S.hp=Math.floor(tot().hp*0.35);S.mp=Math.floor(tot().mp*0.35);
+      S.gold=Math.max(0,S.gold-Math.floor(S.gold*0.03));
+      S.minions=[];S.shield=0;pack=[];
+      log("被圍攻擊倒，撤回營地","warn");
     }
   }
-  // Normalize escaped newline sequences returned by some readers/storage paths before rendering.
-  if (typeof r.reply === 'string') r.reply = r.reply.replace(/\\n/g, '\n');
-  const m=r.intent?`[${r.intent} · ${(r.conf*100).toFixed(0)}%]`:'';
-  addMsg('ai',r.reply,m,{intent:r.intent,text:r.reply});
-  hist.push({role:'ai',content:r.reply,meta:m});saveH();
-  if($('autoSpeak').checked)speak(r.reply);
-  if(r.low&&$('autoLearn').checked&&text.length>=2){if(!cur.candidates)cur.candidates=[];if(!cur.candidates.includes(text)){cur.candidates.push(text);cur.candidates=cur.candidates.slice(-200);save();}sys('這個問題已放入待確認候選記錄，沒有直接當成正確知識。請透過「教它」提供經確認的答案。')}
+  if(S.buffs){["atk","def"].forEach(function(k){if(S.buffs[k+"_dur"]){S.buffs[k+"_dur"]--;if(S.buffs[k+"_dur"]<=0){delete S.buffs[k];delete S.buffs[k+"_dur"]}}})}
+  save();renderAll();
 }
 
-$('send').onclick=send;
-$('input').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}};
-$('input').oninput=()=>{$('input').style.height='auto';$('input').style.height=Math.min($('input').scrollHeight,110)+'px'};
-$('mic').onclick=toggleMic;
-$('gear').onclick=()=>$('panel').classList.toggle('open');
-$('personaSelect').onchange=e=>switchP(e.target.value);
-document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));t.classList.add('active');$('tab-'+t.dataset.tab).classList.add('active')});
+function maxMinions(){return(S.cid==="soul"?6:3)+(mods().summonCap||0)}
+function addMinion(ex,lv){
+  if(!ex||!ex.n)return;var c=ex.c||1;if(S.cid==="soul")c+=1;
+  var t=tot(),m=mods();
+  for(var i=0;i<c;i++){
+    if(S.minions.length>=maxMinions()){var idx=S.minions.findIndex(function(x){return !x.tank});S.minions.splice(idx<0?0:idx,1)}
+    var atk=Math.floor(t.a*(ex.am||0.5)*(1+(m.summonAtk||0)/100)*(1+lv*0.1));
+    var hp=Math.floor(t.hp*(ex.hm||0.4)*(1+(m.summonHp||0)/100)*(1+lv*0.08));
+    if(S.cid==="soul"){atk=Math.floor(atk*1.12);hp=Math.floor(hp*1.12)}
+    S.minions.push({name:ex.n,hp:hp,max:hp,atk:atk,tank:!!ex.tank});
+  }
+  log("召喚 "+c+" 隻"+ex.n+"（"+S.minions.length+"/"+maxMinions()+"）","sum");
+}
 
-$('learnUrlBtn').onclick=()=>deepLearnFromUrl($('learnUrl').value.trim(),true);
-$('previewBtn').onclick=()=>deepLearnFromUrl($('learnUrl').value.trim(),false);
-$('searchSourcesBtn').onclick=()=>showSourceResults($('sourceSearch').value);
-$('sourceSearch').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();showSourceResults($('sourceSearch').value)}};
-$('showSourcesBtn').onclick=()=>showSourceResults('');
+function makeItem(bonus,forceU){
+  bonus=bonus||0;
+  if(forceU||(bonus>=4&&Math.random()<0.04)||Math.random()<0.002){
+    var pool=UNIQUES.filter(function(u){return u.il<=S.lv+12});
+    if(pool.length){var u=pick(pool);return{id:uid(),name:u.name,slot:u.slot,il:u.il,req:u.req,rar:"獨特",mods:Object.assign({},u.mods),bs:Object.assign({},u.bs),id_ed:Math.random()<0.12,sock:0,filled:[],unique:1,desc:u.desc}}
+  }
+  if(bonus>=2&&Math.random()<0.012){
+    var sns=Object.keys(SETS_INFO),sn=pick(sns),pn=pick(SETS_INFO[sn].pieces);
+    var sl=/盔|冠|帽|面/.test(pn)?"頭盔":/甲|袍|衣/.test(pn)?"身體":/刃|杖|錘|弓/.test(pn)?"主手":/戒/.test(pn)?"戒指":/項/.test(pn)?"項鍊":/帶/.test(pn)?"腰帶":/靴/.test(pn)?"鞋子":"副手";
+    var il=Math.min(S.lv+4,50);
+    return{id:uid(),name:pn,slot:sl,il:il,req:Math.max(1,il-4),rar:"套裝",mods:{atkPct:rnd(5,12),hp:rnd(10,24)},bs:{atk:rnd(4,14),def:rnd(4,18)},id_ed:false,set:sn,sock:rnd(0,1),filled:[]};
+  }
+  var elig=BASES.filter(function(b){return b[2]<=S.lv+S.zone*2+5});
+  var b=pick(elig.length?elig:BASES);
+  var il=Math.max(b[2],Math.min(S.lv+rnd(-2,4)+S.zone,b[2]+25));
+  var req=Math.max(1,Math.min(il-rnd(1,4),S.lv+5));
+  var tier=il>=22?3:il>=10?2:1;
+  var r=Math.random(),rar;
+  if(bonus>=3)rar=r<0.55?"稀有":r<0.88?"史詩":r<0.97?"傳奇":"獨特";
+  else if(bonus>=1)rar=r<0.58?"魔法":r<0.9?"稀有":r<0.98?"史詩":"傳奇";
+  else rar=r<0.55?"普通":r<0.88?"魔法":r<0.97?"稀有":r<0.995?"史詩":"傳奇";
+  var cnt=rar==="普通"?0:rar==="魔法"?1:rar==="稀有"?rnd(1,2):rar==="史詩"?rnd(2,3):rnd(2,4);
+  var modsObj={},affNames=[];
+  function addAff(arr){if(!arr.length)return;var a=pick(arr);affNames.push(a[0]);Object.keys(a[1]).forEach(function(k){var rg=a[1][k];modsObj[k]=(modsObj[k]||0)+rnd(rg[0],rg[1])})}
+  var pp=PRE.filter(function(x){return x[2]<=tier}),ss=SUF.filter(function(x){return x[2]<=tier});
+  for(var i=0;i<Math.ceil(cnt/2);i++)addAff(pp);for(var j=0;j<Math.floor(cnt/2);j++)addAff(ss);
+  var bs={atk:b[3][0]?rnd(b[3][0],b[3][1]):0,spell:0,def:b[4][0]?rnd(b[4][0],b[4][1]):0};
+  if(b[1]==="項鍊"||b[1]==="戒指")bs.spell=b[3][0]?rnd(b[3][0],b[3][1]):0;
+  var mul={"普通":1,"魔法":1.1,"稀有":1.25,"史詩":1.45,"傳奇":1.7}[rar]||1;
+  Object.keys(bs).forEach(function(k){bs[k]=Math.floor(bs[k]*mul)});
+  var sock=0;
+  if(rar==="普通"&&b[5]>0&&Math.random()<0.25)sock=rnd(1,Math.min(b[5],6));
+  else if(rar!=="普通"&&b[5]>0&&Math.random()<0.15)sock=rnd(1,Math.min(b[5],4));
+  if(rar==="普通"&&b[5]>=4&&Math.random()<0.08)sock=rnd(4,Math.min(b[5],6));
+  var dispName=(affNames.length?affNames.join(" ")+" ":"")+b[0];
+  return{id:uid(),name:dispName,slot:b[1],il:il,req:req,rar:rar,mods:modsObj,bs:bs,id_ed:rar==="普通"||Math.random()<0.05,sock:sock,filled:[]};
+}
+function handleLoot(it){
+  var cfg=(S.auto&&S.auto.loot)?S.auto.loot:defAuto().loot;
+  var act=cfg[it.rar];
+  if(it.sock>0&&cfg.sock===false)return;
+  if(act===false&&!(it.sock>0&&cfg.sock===true))return;
+  if(act==="sell"&&!(it.sock>0&&cfg.sock===true)){
+    var mul={"普通":1,"魔法":2,"稀有":5,"史詩":12,"傳奇":22,"獨特":40}[it.rar]||1;
+    var v=Math.max(2,Math.floor(it.il*mul));if(!it.id_ed)v=Math.floor(v*0.35);S.gold+=v;log("自動出售 "+itemName(it)+" +"+v,"sys");return;
+  }
+  S.items.push(it);log("掉落 "+itemName(it)+"（"+it.rar+"）"+(it.id_ed?"":" 未鑑定"),"drop");
+}
 
-$('addPairBtn').onclick=()=>{const q=$('pairQ').value.trim(),a=$('pairA').value.trim();if(!q||!a)return;if(addPair(q,a)){save();rebuild();pMeta();meta();$('pairQ').value='';$('pairA').value='';ok('已加入');sys('問答對已加入')}};
-$('addBtn').onclick=()=>{const raw=$('newData').value.trim();if(!raw)return;const items=[];for(const line of raw.split('\n')){const p=line.split('|').map(x=>x.trim()).filter(Boolean);if(p.length<2)continue;for(let i=1;i<p.length;i++)items.push({text:p[i],intent:p[0]})}const res=addItems(items);save();rebuild();meta();$('newData').value='';sys('加入 '+res.a+' 句');ok('完成')};
-$('createPersonaBtn').onclick=()=>createP($('newPersonaName').value);
-$('renamePersonaBtn').onclick=()=>{const n=prompt('新名稱',root.active);if(!n?.trim()||n===root.active)return;if(root.personas[n.trim()]){alert('已存在');return}root.personas[n.trim()]=root.personas[root.active];delete root.personas[root.active];root.active=n.trim();cur=root.personas[root.active];save();pUI();ok('已改名')};
-$('deletePersonaBtn').onclick=()=>{if(Object.keys(root.personas).length<=1){alert('至少留一個');return}if(!confirm('刪除？'))return;delete root.personas[root.active];root.active=Object.keys(root.personas)[0];cur=root.personas[root.active];save();rebuild();pUI();meta();sys('已刪除')};
-$('manageBtn').onclick=()=>{const list=$('memList');list.replaceChildren();let c=0;for(const i of Object.keys(cur.data||{}).sort()){for(const t of cur.data[i]||[]){if(c++>=120)break;const d=document.createElement('div');d.className='list-item';const body=document.createElement('div');body.style.flex='1';const tag=document.createElement('span');tag.style.color='var(--gold)';tag.style.fontSize='11px';tag.textContent='['+i+'] ';body.append(tag,document.createTextNode(t));const b=document.createElement('button');b.className='del';b.textContent='刪';b.onclick=()=>{const idx=(cur.data[i]||[]).indexOf(t);if(idx>=0)cur.data[i].splice(idx,1);if(!cur.data[i]?.length)delete cur.data[i];save();rebuild();meta();$('manageBtn').onclick()};d.append(body,b);list.appendChild(d)}if(c>=120)break}$('manageModal').classList.add('show')};
-$('closeManage').onclick=()=>$('manageModal').classList.remove('show');
-$('managePairBtn').onclick=()=>{const list=$('pairList');list.replaceChildren();(cur.pairs||[]).forEach((p,idx)=>{const d=document.createElement('div');d.className='list-item';const body=document.createElement('div');body.style.flex='1';const q=document.createElement('div');q.style.color='var(--accent)';q.style.fontSize='12px';q.textContent='Q: '+String(p.q||'');const a=document.createElement('div');a.textContent='A: '+String(p.a||'');body.append(q,a);const b=document.createElement('button');b.className='del';b.textContent='刪';b.onclick=()=>{cur.pairs.splice(idx,1);save();rebuild();pMeta();$('managePairBtn').onclick()};d.append(body,b);list.appendChild(d)});$('pairModal').classList.add('show')};
-$('closePair').onclick=()=>$('pairModal').classList.remove('show');
-$('confirmTeach').onclick=()=>{const intent=$('teachIntent').value.trim()||'user_taught';const raw=$('teachReply').value.trim();if(!raw)return;const rs=raw.split('|').map(s=>s.trim()).filter(Boolean);addItems(rs.map(t=>({text:t,intent})));if(lastU)addItems([{text:lastU,intent}]);if($('teachAsPair').checked&&lastU)for(const r of rs)addPair(lastU,r);save();rebuild();meta();pMeta();sys('已學會');ok('完成');$('teachModal').classList.remove('show')};
-$('cancelTeach').onclick=()=>$('teachModal').classList.remove('show');
-$('exportBtn').onclick=()=>{try{const histories={};for(const n of Object.keys(root.personas)){try{histories[n]=JSON.parse(localStorage.getItem(LS+'_h_'+n)||'[]')}catch(e){histories[n]=[]}}const payload={format:'niukou-ai-full-backup',version:3,exportedAt:new Date().toISOString(),root:root,histories:histories};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`Niukou-Full-Backup-${Date.now()}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);ok('完整備份已匯出，包含所有人格、知識、問答對、回饋及可讀取的對話紀錄。請確認檔案已存入「檔案」App。')}catch(e){err('匯出失敗：'+e.message)}};
-$('importBtn').onclick=()=>{const inp=document.createElement('input');inp.type='file';inp.accept='.json,application/json';inp.onchange=()=>{const file=inp.files&&inp.files[0];if(!file)return;if(file.size>5*1024*1024){err('備份檔超過 5 MB，為保護手機暫不匯入。');return}const r=new FileReader();r.onload=()=>{try{const o=JSON.parse(r.result);if(o&&o.format==='niukou-ai-full-backup'&&validRoot(o.root)){if(!confirm('這是完整備份。匯入會取代目前所有人格與知識，建議先匯出目前資料。確定繼續？'))return;root=o.root;if(!root.personas[root.active])root.active=Object.keys(root.personas)[0]||'預設';if(!root.personas[root.active])root.personas['預設']=defP();cur=root.personas[root.active];save();for(const n of Object.keys(root.personas)){const h=Array.isArray(o.histories&&o.histories[n])?o.histories[n].filter(m=>m&&['user','ai','sys'].includes(m.role)&&typeof m.content==='string').slice(-200):[];try{localStorage.setItem(LS+'_h_'+n,JSON.stringify(h))}catch(e){}}rebuild();pUI();loadH();$('chat').replaceChildren();for(const m of hist)addMsg(m.role,m.content,m.meta,{intent:null,text:m.content});meta();pMeta();ok('完整備份還原完成。請再次匯出，確認新備份可正常保存。');return}if(!o||typeof o!=='object'||!o.data||typeof o.data!=='object')throw new Error('檔案格式不正確，找不到知識資料。');const entries=Object.entries(o.data);if(entries.length>5000)throw new Error('分類數量異常，已停止匯入。');const items=[];for(const [i,a] of entries){if(typeof i!=='string'||!Array.isArray(a))continue;for(const t of a){if(typeof t==='string'&&t.length<=5000)items.push({text:t,intent:i.slice(0,120)})}}if(items.length>50000)throw new Error('資料筆數過多，已停止匯入。');const incomingPairs=Array.isArray(o.pairs)?o.pairs.filter(p=>p&&typeof p.q==='string'&&typeof p.a==='string'&&p.q.length<=5000&&p.a.length<=10000).slice(0,20000):[];const res=addItems(items);for(const p of incomingPairs)addPair(p.q,p.a);save();rebuild();meta();pMeta();ok(`舊版備份匯入完成：新增 ${res.a} 句；問答對已合併。請檢查內容及來源。`)}catch(e){err('匯入失敗：'+e.message)}};r.onerror=()=>err('無法讀取備份檔。');r.readAsText(file)};inp.click()};
-$('statsBtn').onclick=()=>{const c={};for(const m of bank)c[m.intent]=(c[m.intent]||0)+1;alert(`人格 ${root.active}\n句子 ${bank.length}\n問答對 ${pairs.length}\n\n`+Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,25).map(e=>e[0]+'：'+e[1]).join('\n'))};
-$('clearChatBtn').onclick=()=>{if(confirm('清空對話？')){hist=[];saveH();$('chat').innerHTML='';sys('對話已清空')}};
-$('resetBtn').onclick=()=>{if(confirm('清空此人格？')){cur.data={};cur.pairs=[];cur.feedback={};save();rebuild();meta();pMeta();sys('已清空')}};
+function isEquipped(id){for(var k in S.eq)if(S.eq[k]===id)return true;return false}
+function getEq(slot){var id=S.eq[slot];if(!id)return null;for(var i=0;i<S.items.length;i++)if(S.items[i].id===id)return S.items[i];return null}
+function doEquip(id){
+  var it=null;for(var i=0;i<S.items.length;i++)if(S.items[i].id===id){it=S.items[i];break}
+  if(!it)return;if(!it.id_ed){log("請先鑑定","warn");return}if(it.req&&S.lv<it.req){log("需要等級 "+it.req,"warn");return}
+  var slot=it.slot;if(slot==="戒指")slot=!getEq("戒指1")?"戒指1":"戒指2";
+  S.eq[slot]=id;log("裝備 "+itemName(it),"sys");save();renderAll();
+}
+function doUnequip(slot){delete S.eq[slot];save();renderAll()}
+function doSellOne(id){
+  var idx=-1,it=null;for(var i=0;i<S.items.length;i++)if(S.items[i].id===id){idx=i;it=S.items[i];break}
+  if(idx<0)return;for(var k in S.eq)if(S.eq[k]===id)delete S.eq[k];
+  var mul={"普通":1,"魔法":2,"稀有":5,"史詩":12,"傳奇":22,"獨特":40,"套裝":16}[it.rar]||1;
+  var v=Math.max(2,Math.floor((it.il+Object.keys(it.mods||{}).reduce(function(a,k){return a+Math.abs(it.mods[k])},0))*mul));
+  if(!it.id_ed)v=Math.floor(v*0.35);S.gold+=v;S.items.splice(idx,1);log("出售 "+itemName(it)+" +"+v,"sys");save();renderAll();
+}
+function doSellByRarity(rar){
+  var list=S.items.filter(function(it){return !isEquipped(it.id)&&(rar==="all"||it.rar===rar)});
+  if(!list.length){log("沒有可出售物品","sys");return}
+  askYes(rar==="all"?"出售全部未裝備（"+list.length+"件）？":"出售全部未裝備「"+rar+"」（"+list.length+"件）？",function(){
+    var gold=0;list.forEach(function(it){
+      var mul={"普通":1,"魔法":2,"稀有":5,"史詩":12,"傳奇":22,"獨特":40,"套裝":16}[it.rar]||1;
+      var v=Math.max(2,Math.floor((it.il+Object.keys(it.mods||{}).reduce(function(a,k){return a+Math.abs(it.mods[k])},0))*mul));
+      if(!it.id_ed)v=Math.floor(v*0.35);gold+=v;
+      var ix=S.items.findIndex(function(x){return x.id===it.id});if(ix>=0)S.items.splice(ix,1);
+    });S.gold+=gold;log("出售 "+list.length+" 件 +"+gold+"金","sys");save();renderAll();
+  });
+}
+function doIdentify(id){
+  if(!S.pot.idS){log("沒有鑑定卷軸","warn");return}
+  var it=null;for(var i=0;i<S.items.length;i++)if(S.items[i].id===id){it=S.items[i];break}
+  if(!it||it.id_ed)return;S.pot.idS--;it.id_ed=true;log("鑑定："+it.name+"（"+it.rar+"）","drop");save();renderAll();
+}
+function doIdentifyAll(){
+  var n=0;for(var i=0;i<S.items.length;i++){if(S.items[i].id_ed||isEquipped(S.items[i].id))continue;if(!S.pot.idS)break;S.pot.idS--;S.items[i].id_ed=true;n++}
+  log("一鍵鑑定 "+n+" 件","sys");save();renderAll();
+}
+function trySocket(itemId,runeId){
+  var it=null;for(var i=0;i<S.items.length;i++)if(S.items[i].id===itemId){it=S.items[i];break}
+  if(!it||!it.id_ed)return;if(!it.sock||(it.filled||[]).length>=it.sock){log("無空凹槽","warn");return}
+  if(it.rar!=="普通"&&!it.rw){log("符文之語只能鑲嵌在白色（普通）有孔裝備上","warn");return}
+  var idx=S.runes.indexOf(runeId);if(idx<0){log("無此符文","warn");return}
+  S.runes.splice(idx,1);if(!it.filled)it.filled=[];it.filled.push(runeId);
+  var key=it.filled.join("+");
+  for(var r=0;r<RUNEWORDS.length;r++){
+    if(RUNEWORDS[r].r.join("+")===key&&it.sock>=RUNEWORDS[r].s){
+      it.rw=RUNEWORDS[r].name;it.rwMods=Object.assign({},RUNEWORDS[r].m);
+      log("符文之語「"+it.rw+"」完成！","drop");save();renderAll();return;
+    }
+  }
+  log("鑲嵌 "+runeId,"sys");save();renderAll();
+}
 
-(function(){
-  load();rebuild();pUI();loadH();initSpeech();
-  if(hist.length)for(const m of hist){if(m.role==='ai')addMsg(m.role,m.content,m.meta,{intent:null,text:m.content});else addMsg(m.role,m.content)}
-  if(!bank.length&&!pairs.length){
-    addItems([{text:'你好',intent:'greeting'},{text:'我可以學習任何你給的網址',intent:'default'},{text:'把新聞或文章網址貼給我，我會去瀏覽並吸收',intent:'default'}]);
-    save();rebuild();
-    sys('我是鈕釦 AI v24.0 嚴謹檢索版。已加強本次學習批次與舊來源的隔離，並降低通用詞造成的無關檢索。我仍未接入真正的通用語言模型；目前能保存、檢索與整理原文摘錄；v13 會避免隨機輸出記憶片段，並將內建基礎知識與本次來源分開標示。仍未具備完整通用推理能力。');
-  }else sys(`鈕釦 AI v24.0 就緒｜人格「${root.active}」（${bank.length}句 · ${pairs.length}對）。\n本版本改善中英文關鍵詞拆分、來源段落檢索與證據摘錄；避免把隨機拼字當成回答，並區分內建基礎知識與來源摘錄；多頁讀取仍受瀏覽器代理、網站登入與動態內容限制。重要記憶請定期匯出備份。`);
-  meta();pMeta();st('就緒','ok');
+function learnSkill(key){
+  var sk=getSkill(key);if(!sk)return;var n=S.skills[key]||0;
+  if(S.sp<1){log("技能點不足","warn");return}if(S.lv<sk.req){log("需等級 "+sk.req,"warn");return}if(n>=5){log("已滿級","warn");return}
+  if(S.specTree&&S.specTree!==sk.tree){log("你已專精「"+S.specTree+"」，無法學習其他系技能","warn");return}
+  if(!S.specTree)S.specTree=sk.tree;
+  S.skills[key]=n+1;S.sp--;
+  log((n?"強化":"學會")+" "+sk.n+" Lv."+(n+1)+(sk.t==="passive"?"（常駐）":"")+"　專精："+S.specTree,"sys");
+  save();renderAll();
+}
+function addAttr(stat,pts){
+  pts=Math.max(1,Math.min(pts||1,S.ap));if(S.ap<1)return;
+  S.ap-=pts;S[stat]+=pts;if(stat==="vit"){S.mhp+=pts*2;S.hp+=pts*2}if(stat==="ene"){S.mmp+=pts*2;S.mp+=pts*2}
+  log({str:"力量",dex:"敏捷",vit:"體力",ene:"能量"}[stat]+" +"+pts,"sys");save();renderAll();
+}
+function buyPot(id){
+  var p=null;for(var i=0;i<POTIONS.length;i++)if(POTIONS[i].id===id){p=POTIONS[i];break}if(!p)return;
+  if(S.gold<p.p){log("金幣不足","warn");return}S.gold-=p.p;
+  if(p.id==="town")S.pot.town++;else if(p.id==="idS")S.pot.idS=(S.pot.idS||0)+1;else S.pot[p.id]=(S.pot[p.id]||0)+1;
+  log("購買 "+p.n,"sys");save();renderAll();
+}
+function usePot(id){
+  if(id==="town"){if(!S.pot.town){log("沒有歸營卷軸","warn");return}S.pot.town--;pack=[];S.minions=[];S.shield=0;stopAuto();log("返回營地","sys");save();renderAll();return}
+  if(id==="idS"){log("請在裝備頁鑑定","sys");return}
+  var all=POTIONS.concat(DROP_POT),p=null;for(var i=0;i<all.length;i++)if(all[i].id===id){p=all[i];break}
+  if(!p||!S.pot[id]){log("藥劑不足","warn");return}S.pot[id]--;var t=tot();
+  if(p.type==="hp")S.hp=Math.min(t.hp,S.hp+p.v);else S.mp=Math.min(t.mp,S.mp+p.v);
+  log("使用 "+p.n,"heal");save();renderAll();
+}
+
+function autoTick(){
+  if(!S||!autoOn)return;var t=tot(),cfg=S.auto||defAuto();
+  if(S.hp<t.hp*cfg.hpTh){var hps=[cfg.hpPot,"hpX","hpL","hpM","hpS"];for(var i=0;i<hps.length;i++)if(S.pot[hps[i]]){usePot(hps[i]);return}}
+  if(S.mp<t.mp*cfg.mpTh){var mps=[cfg.mpPot,"mpX","mpL","mpM","mpS"];for(var j=0;j<mps.length;j++)if(S.pot[mps[j]]){usePot(mps[j]);return}}
+  if(cfg.reSummon){var ss=Object.keys(S.skills).filter(function(k){var sk=getSkill(k);return sk&&sk.t==="summon"&&S.skills[k]>0});if(!S.minions.length&&ss.length){fight((cfg.skills.filter(function(k){return ss.indexOf(k)>=0})[0])||ss[0]);return}}
+  var act=(cfg.skills||[]).filter(function(k){var sk=getSkill(k);return sk&&sk.t!=="passive"&&S.skills[k]>0});
+  if(cfg.preferSkill&&act.length){var can=act.filter(function(k){var sk=getSkill(k);var c=(sk.t==="spell"||sk.t==="dot")?Math.max(3,4+(S.skills[k]||1)*2):(sk.t==="summon"?5+(S.skills[k]||1):3);return S.mp>=c});if(can.length){fight(pick(can));return}}
+  fight();
+}
+function startAuto(){if(autoTimer)return;autoTimer=setInterval(autoTick,1800);autoOn=true;log("自動啟動","sys")}
+function stopAuto(){if(autoTimer)clearInterval(autoTimer);autoTimer=null;autoOn=false}
+function toggleAuto(){if(autoOn)stopAuto();else startAuto();renderAll()}
+
+/* 渲染 */
+function switchTab(tab){document.querySelectorAll("#tabs button").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-tab")===tab)});["hero","hunt","auto","skills","gear","runes","shop"].forEach(function(t){var el=$("v-"+t);if(el)el.classList.toggle("on",t===tab)})}
+function renderStatBar(){
+  if(!S)return;var t=tot();
+  $("heroTitle").textContent=S.name+" · "+CLASSES[S.cid].n+" Lv."+S.lv+(S.lv>=MAX_LV?"(滿)":"");
+  $("statBar").innerHTML='<div class="stat">生命<b>'+Math.max(0,S.hp)+"/"+t.hp+'</b><div class="bar"><i style="width:'+Math.max(0,S.hp/t.hp*100)+'%"></i></div></div>'+
+    '<div class="stat">魔力<b>'+Math.max(0,S.mp)+"/"+t.mp+'</b><div class="bar mp"><i style="width:'+Math.max(0,S.mp/t.mp*100)+'%"></i></div></div>'+
+    '<div class="stat">等級<b>'+S.lv+'/'+MAX_LV+'</b><div class="mu">'+S.xp+"/"+needXp()+'</div><div class="bar xp"><i style="width:'+Math.min(100,S.xp/needXp()*100)+'%"></i></div></div>'+
+    '<div class="stat">攻擊/法<b>'+t.a+"/"+t.sp+'</b></div><div class="stat">防禦/抗<b>'+t.d+"/"+(t.m.res||0)+'</b></div><div class="stat">金幣<b>'+S.gold.toLocaleString()+'</b></div>';
+}
+function renderHero(){
+  var t=tot(),m=t.m;
+  var minH=S.minions.length?S.minions.map(function(mn){return'<div class="minion">'+esc(mn.name)+(mn.tank?" [坦]":"")+" "+mn.hp+"/"+mn.max+" 攻"+mn.atk+"</div>"}).join(""):'<div class="mu">無僕從</div>';
+  $("v-hero").innerHTML='<div class="mu">'+CLASSES[S.cid].r+(S.specTree?'　<span style="color:var(--g)">專精：'+S.specTree+'</span>':'　<span class="mu">尚未選擇專精系</span>')+'</div>'+
+    '<div style="margin:6px 0">技能點 <b style="color:var(--g)">'+S.sp+'</b>　屬性點 <b style="color:var(--g)">'+S.ap+'</b>　擊殺 '+S.kills+'／首領 '+S.boss+(S.shield?"　護盾 "+S.shield:"")+'</div>'+
+    '<div class="info-grid">'+
+      '<div class="info-box"><div class="t">基礎屬性</div>力量 '+S.str+'<br>敏捷 '+S.dex+'<br>體力 '+S.vit+'<br>能量 '+S.ene+'</div>'+
+      '<div class="info-box"><div class="t">戰鬥</div>攻擊 '+t.a+'　法傷 '+t.sp+'<br>防禦 '+t.d+'　抗性 '+(m.res||0)+'<br>偷取 '+(m.lifeSteal||0)+'%　回血 '+(m.lifeRegen||0)+'</div>'+
+      '<div class="info-box"><div class="t">元素抗性</div>火 '+(m.fireRes||0)+'%　冰 '+(m.coldRes||0)+'%<br>雷 '+(m.lightRes||0)+'%　毒 '+(m.poisonRes||0)+'%<br>詛咒 '+(m.curseRes||0)+'%</div>'+
+      '<div class="info-box"><div class="t">召喚</div>上限 '+maxMinions()+'　目前 '+S.minions.length+'<br>召攻+'+(m.summonAtk||0)+'%　召血+'+(m.summonHp||0)+'%</div>'+
+    '</div>'+
+    '<div style="background:#12121a;border:1px solid var(--ln);border-radius:8px;padding:8px;margin:8px 0">'+
+      '<div class="mu">分配屬性（剩 '+S.ap+'，每級+1，滿級共100）</div>'+
+      [["str","力量"],["dex","敏捷"],["vit","體力"],["ene","能量"]].map(function(p){
+        return'<div class="attr-row"><span>'+p[1]+' <b>'+S[p[0]]+'</b></span><div class="attr-ctrl">'+
+          '<button type="button" class="btn-attr" data-stat="'+p[0]+'" data-pts="1"'+(S.ap<1?" disabled":"")+'>+</button>'+
+          '<button type="button" class="btn-attr" data-stat="'+p[0]+'" data-pts="5"'+(S.ap<5?" disabled":"")+'>+5</button></div></div>';
+      }).join("")+'</div>'+
+    '<div class="row"><button class="sm btn-pot" data-pot="hpS">生命×'+(S.pot.hpS||0)+'</button><button class="sm btn-pot" data-pot="mpS">魔力×'+(S.pot.mpS||0)+'</button><button class="sm btn-pot" data-pot="town">歸營×'+(S.pot.town||0)+'</button>'+(S.pot.hpX?'<button class="sm btn-pot" data-pot="hpX">深淵血×'+S.pot.hpX+'</button>':'')+'</div>'+
+    '<div style="margin-top:10px"><b>僕從 '+S.minions.length+'/'+maxMinions()+'</b></div>'+minH;
+}
+function renderHunt(){
+  if(!pack.length||pack.every(function(e){return e.hp<=0}))pack=genPack();
+  var alive=pack.filter(function(e){return e.hp>0});
+  $("v-hunt").innerHTML='<div class="zone-scroll">'+ZONES.map(function(z){
+    var lock=S.lv<z.min||(z.unique&&S.diff<2);
+    return'<button class="sm btn-zone'+(S.zone===z.id?" primary":"")+'" data-zone="'+z.id+'"'+(lock?" disabled":"")+'>'+z.name+(z.unique?"(煉獄)":"")+(S.lv<z.min?" Lv"+z.min:"")+'</button>';
+  }).join("")+'</div>'+
+    '<div class="row" style="margin:8px 0">'+DIFF.map(function(d,i){return'<button class="sm btn-diff'+(S.diff===i?" primary":"")+'" data-diff="'+i+'">'+d[0]+'</button>'}).join("")+'</div>'+
+    '<div class="mu" style="margin-bottom:6px">戰場敵人 '+alive.length+'/8</div>'+
+    alive.map(function(e){
+      return'<div class="enemy-box"><b>'+esc(e.name)+'</b> '+
+        (e.rank==="unique"?'<span class="pill" style="color:var(--or)">獨特</span>':e.rank==="boss"?'<span class="pill" style="color:var(--or)">首領</span>':e.rank==="champ"?'<span class="pill" style="color:var(--g)">精英</span>':'')+
+        (e.ele?'<span class="pill">'+eleName(e.ele)+'</span>':'')+
+        '<div class="mu">Lv.'+e.lv+' HP '+Math.max(0,e.hp)+'/'+e.max+' 攻'+e.atk+' 防'+e.def+(e.affixes&&e.affixes.length?' · '+e.affixes.join(","):'')+'</div></div>';
+    }).join("")+
+    '<div class="row" style="margin-top:8px">'+
+      '<button class="primary" id="btnFight" style="flex:1">攻擊</button>'+
+      '<button id="btnToggleAuto" style="flex:1">'+(autoOn?"停止自動":"開始自動")+'</button></div>'+
+    '<div class="notice">普通：僅首領有詞綴　夢魘：精英+有詞綴　煉獄：全怪有詞綴且高抗性<br>精英/首領/獨特會帶7隻隨從，最多8隻圍攻</div>';
+}
+function renderAuto(){
+  var cfg=S.auto||defAuto();
+  var sks=Object.keys(S.skills).filter(function(k){var sk=getSkill(k);return sk&&sk.t!=="passive"&&S.skills[k]>0});
+  var checks=sks.length?sks.map(function(k){var sk=getSkill(k);return'<label><input type="checkbox" class="auto-sk" data-sk="'+k+'"'+(cfg.skills.indexOf(k)>=0?" checked":"")+'> '+sk.n+'</label>'}).join(""):'<div class="mu">尚無主動技能</div>';
+  var rars=["普通","魔法","稀有","史詩","傳奇","獨特","套裝"];
+  $("v-auto").innerHTML='<div class="cfg"><b>自動施放</b>'+checks+
+    '<label><input type="checkbox" id="chkReSum"'+(cfg.reSummon?" checked":"")+'> 僕從全死再召喚</label>'+
+    '<label><input type="checkbox" id="chkPref"'+(cfg.preferSkill!==false?" checked":"")+'> 優先勾選技能</label>'+
+    '<div style="margin-top:8px"><b>喝藥閾值</b></div>'+
+    '<div class="row">生命&lt;<input type="number" id="inpHpTh" min="5" max="90" value="'+Math.round(cfg.hpTh*100)+'" style="width:56px">%</div>'+
+    '<div class="row">魔力&lt;<input type="number" id="inpMpTh" min="5" max="90" value="'+Math.round(cfg.mpTh*100)+'" style="width:56px">%</div>'+
+    '<div style="margin-top:8px"><b>自動撿取</b></div>'+
+    rars.map(function(r){var v=cfg.loot[r];return'<div class="row"><span class="'+r+'" style="width:40px">'+r+'</span><select class="loot-sel" data-rar="'+r+'"><option value="true"'+(v===true?" selected":"")+'>撿</option><option value="sell"'+(v==="sell"?" selected":"")+'>賣</option><option value="false"'+(v===false?" selected":"")+'>不撿</option></select></div>'}).join("")+
+    '<div class="row" style="margin-top:10px"><button class="primary" id="btnToggleAuto2" style="flex:1">'+(autoOn?"停止":"開始自動")+'</button></div></div>';
+}
+function renderSkills(){
+  var trees=TREES[S.cid],list=buildSkills(S.cid);
+  $("v-skills").innerHTML='<div class="notice">專精限制：只能投入一個系別。一旦學習某系技能，其他系將鎖定。滿級共100技能點。</div>'+
+    (S.specTree?'<div class="mu" style="margin:6px 0">目前專精：<b style="color:var(--g)">'+S.specTree+'</b></div>':'')+
+    trees.map(function(tr){
+      var locked=S.specTree&&S.specTree!==tr;
+      return'<div style="margin-bottom:12px"><b style="color:'+(locked?"var(--mu)":"var(--g)")+'">'+tr+(locked?"（已鎖定）":"")+'</b>'+
+        list.filter(function(s){return s.tree===tr}).map(function(s){
+          var n=S.skills[s.key]||0;
+          return'<div class="sk-card" style="'+(locked?"opacity:0.5":"")+'"><div style="color:var(--b);font-weight:600">'+s.n+'</div>'+
+            '<div class="mu">Lv'+n+'/5 · 需'+s.req+' · '+s.t+(s.t==="passive"?" · 常駐":"")+'</div>'+
+            '<div class="mu">'+s.d+'</div>'+
+            '<button class="sm btn-learn" data-key="'+s.key+'" style="margin-top:6px"'+(locked?" disabled":"")+'>'+(n?"強化":"學習")+'</button></div>';
+        }).join("")+'</div>';
+    }).join("");
+}
+function renderGear(){
+  var bag=S.items.filter(function(it){return !isEquipped(it.id)});
+  $("v-gear").innerHTML='<b>已裝備</b><div class="eq-grid" style="margin:8px 0">'+SLOTS.map(function(slot){
+    var it=getEq(slot);
+    return'<div class="eq-slot"><div class="lab">'+slot+'</div>'+(it?'<span class="'+it.rar+'">'+esc(itemName(it))+'</span>'+(it.rw?' <span class="link btn-rw" data-rw="'+it.rw+'">查看</span>':'')+(it.set?' <span class="link btn-set" data-set="'+it.set+'">套裝</span>':'')+'<div class="mu">'+esc(itemDesc(it))+'</div><button class="sm btn-unequip" data-slot="'+slot+'">卸下</button>':'<span class="mu">空</span>')+'</div>';
+  }).join("")+'</div>'+
+    '<div class="row" style="margin:8px 0"><b>背包（'+bag.length+'）</b><button class="sm" id="btnIdAll">一鍵鑑定</button></div>'+
+    '<div class="sell-bar"><button class="sm btn-sell-rar" data-rar="普通">賣普通</button><button class="sm btn-sell-rar" data-rar="魔法">賣魔法</button><button class="sm btn-sell-rar" data-rar="稀有">賣稀有</button><button class="sm btn-sell-rar" data-rar="史詩">賣史詩</button><button class="sm danger btn-sell-rar" data-rar="all">全賣</button></div>'+
+    (bag.length?bag.map(function(it){
+      return'<div class="item"><span class="'+it.rar+'" style="font-weight:600">'+esc(itemName(it))+'</span><span class="pill">'+it.rar+'</span>'+
+        (it.req?'<span class="pill">需'+it.req+'</span>':'')+(!it.id_ed?'<span class="pill" style="color:var(--r)">未鑑定</span>':'')+
+        (it.sock?'<span class="pill">洞'+(it.filled?it.filled.length:0)+'/'+it.sock+'</span>':'')+
+        (it.set?'<span class="pill link btn-set" data-set="'+it.set+'">套裝</span>':'')+
+        (it.rw?'<span class="pill link btn-rw" data-rw="'+it.rw+'">符文之語</span>':'')+
+        '<div class="mu">'+it.slot+' · '+esc(itemDesc(it))+'</div>'+
+        '<div class="row" style="margin-top:6px">'+(!it.id_ed?'<button class="sm primary btn-id" data-id="'+it.id+'">鑑定</button>':'<button class="sm btn-equip" data-id="'+it.id+'">裝備</button>')+
+        '<button class="sm btn-sell-one" data-id="'+it.id+'">出售</button>'+
+        (it.id_ed&&it.sock&&it.rar==="普通"&&(it.filled||[]).length<it.sock?'<button class="sm btn-sock" data-id="'+it.id+'">鑲嵌</button>':'')+
+        '</div></div>';
+    }).join(""):'<div class="mu">背包空</div>')+
+    '<div class="notice">符文之語只能鑲嵌在白色（普通）有孔裝備。最多6孔。套裝／符文之語可點擊查看。</div>';
+}
+function renderRunes(){
+  var cnt={};(S.runes||[]).forEach(function(r){cnt[r]=(cnt[r]||0)+1});
+  var list=Object.keys(cnt).map(function(id){
+    var rn=null;for(var i=0;i<RUNES.length;i++)if(RUNES[i].id===id||RUNES[i].n===id){rn=RUNES[i];break}
+    var mods=rn?Object.keys(rn.m).map(function(k){return fmtAffix(k,rn.m[k])}).join(" · "):"";
+    return'<div class="item"><b>'+(rn?rn.n:id)+'</b> ×'+cnt[id]+' <span class="mu">'+mods+'</span></div>';
+  }).join("")||'<div class="mu">無符文</div>';
+  $("v-runes").innerHTML=list+'<div style="margin-top:12px"><b>符文之語配方</b> <span class="mu">（僅白裝有孔）</span></div>'+
+    RUNEWORDS.map(function(rw){
+      return'<div class="item"><b class="link btn-rw" data-rw="'+rw.name+'" style="color:var(--g)">'+rw.name+'</b> <span class="pill">'+rw.s+'洞</span> <span class="mu">'+rw.d+'</span>'+
+        '<div class="mu">'+rw.r.join(" + ")+'</div>'+
+        '<div class="mu">'+Object.keys(rw.m).map(function(k){return fmtAffix(k,rw.m[k])}).join(" · ")+'</div></div>';
+    }).join("");
+}
+function renderShop(){
+  $("v-shop").innerHTML='<div class="mu" style="margin-bottom:8px">無限庫存</div>'+
+    POTIONS.map(function(p){return'<div class="item"><b>'+p.n+'</b> <span class="mu">'+p.p+'金</span><button class="sm btn-buy" data-id="'+p.id+'" style="float:right">購買</button></div>'}).join("")+
+    '<div class="notice">深淵藥僅精英/首領掉落</div>';
+}
+function renderAll(){if(!S)return;renderStatBar();renderHero();renderHunt();renderAuto();renderSkills();renderGear();renderRunes();renderShop();renderLog()}
+
+function renderSelect(){
+  $("charSelect").classList.remove("hidden");$("gameUI").classList.add("hidden");stopAuto();
+  var html="";
+  for(var i=0;i<2;i++){
+    if(slots[i]){var ch=slots[i];html+='<div class="char-card"><b>'+esc(ch.name)+'</b><div class="mu">'+(CLASSES[ch.cid]?CLASSES[ch.cid].n:"?")+' · Lv.'+ch.lv+' · 擊殺 '+(ch.kills||0)+'</div><div class="btns"><button class="primary btn-enter" data-idx="'+i+'">進入</button><button class="danger btn-del" data-idx="'+i+'">刪除</button></div></div>'}
+    else html+='<div class="char-card"><div class="mu">空欄位</div><div class="btns"><button class="primary btn-create" data-idx="'+i+'">建立新角色</button></div></div>';
+  }
+  $("slotList").innerHTML=html;$("createArea").classList.add("hidden");
+}
+function showCreate(idx){
+  if(slots.filter(Boolean).length>=2){showDlg("提示","已滿2個角色");return}
+  selClass="iron";window._cidx=idx;$("createArea").classList.remove("hidden");
+  $("classGrid").innerHTML=Object.keys(CLASSES).map(function(k){var v=CLASSES[k];return'<div class="class-card'+(selClass===k?" on":"")+'" data-cls="'+k+'"><h4>'+v.n+'</h4><div class="mu">'+v.r+'</div></div>'}).join("");
+}
+function enterSlot(i){
+  if(i<0||i>1||!slots[i])return;active=i;S=JSON.parse(JSON.stringify(slots[i]));
+  S.minions=S.minions||[];S.runes=migrateRunes(S.runes||[]);S.auto=S.auto||defAuto();
+  if(!S.auto.loot)S.auto.loot=defAuto().loot;S.buffs=S.buffs||{};S.shield=S.shield||0;
+  S.str=S.str!=null?S.str:CLASSES[S.cid].a[0];S.dex=S.dex!=null?S.dex:CLASSES[S.cid].a[1];
+  S.vit=S.vit!=null?S.vit:CLASSES[S.cid].a[2];S.ene=S.ene!=null?S.ene:CLASSES[S.cid].a[3];
+  S.ap=S.ap!=null?S.ap:0;S.sp=S.sp!=null?S.sp:0;S.specTree=S.specTree||null;
+  S.pot=Object.assign({hpS:3,mpS:3,town:1,idS:2},S.pot||{});
+  S.items=(S.items||[]).map(function(it){return Object.assign({},it,{id_ed:it.id_ed!=null?it.id_ed:true,filled:migrateRunes(it.filled||[]),sock:it.sock||0,req:it.req!=null?it.req:Math.max(1,(it.il||1)-3)})});
+  pack=[];
+  if(S.lastSave){var min=Math.floor((Date.now()-S.lastSave)/60000);if(min>=5){min=Math.min(min,360);var fights=Math.floor(min*0.4*(1+S.diff*0.1));if(fights>=1){var xp=0,gold=0;for(var f=0;f<fights;f++){xp+=Math.floor((8+S.lv*3)*DIFF[S.diff][2]*0.4);gold+=Math.floor((2+S.lv)*DIFF[S.diff][1]*0.4)}S.xp+=xp;S.gold+=gold;S.kills+=fights;levelUp();log("離線"+min+"分 +"+xp+"經驗 +"+gold+"金","sys")}}}
+  $("charSelect").classList.add("hidden");$("gameUI").classList.remove("hidden");
+  log("進入遠征","sys");renderAll();switchTab("hero");
+}
+
+document.addEventListener("click",function(ev){
+  var t=ev.target;
+  if(t.classList.contains("btn-enter")){enterSlot(+t.getAttribute("data-idx"));return}
+  if(t.classList.contains("btn-del")){var di=+t.getAttribute("data-idx");if(!slots[di])return;askYes("確定刪除「"+slots[di].name+"」？",function(){slots[di]=null;slots=slots.filter(Boolean);while(slots.length<2)slots.push(null);saveAll();renderSelect()});return}
+  if(t.classList.contains("btn-create")){showCreate(+t.getAttribute("data-idx"));return}
+  if(t.classList.contains("class-card")||t.closest(".class-card")){var card=t.classList.contains("class-card")?t:t.closest(".class-card");selClass=card.getAttribute("data-cls");document.querySelectorAll(".class-card").forEach(function(c){c.classList.toggle("on",c.getAttribute("data-cls")===selClass)});return}
+  if(!S)return;
+  if(t.classList.contains("btn-attr")){addAttr(t.getAttribute("data-stat"),+t.getAttribute("data-pts"));return}
+  if(t.classList.contains("btn-pot")){usePot(t.getAttribute("data-pot"));return}
+  if(t.id==="btnFight"){fight();return}
+  if(t.id==="btnToggleAuto"||t.id==="btnToggleAuto2"){toggleAuto();return}
+  if(t.classList.contains("btn-zone")){var z=+t.getAttribute("data-zone");var zz=ZONES[z];if(S.lv<zz.min){log("需等級 "+zz.min,"warn");return}if(zz.unique&&S.diff<2){log("諸王陵寢僅煉獄可進","warn");return}S.zone=z;pack=[];log("前往 "+zz.name,"sys");save();renderAll();return}
+  if(t.classList.contains("btn-diff")){S.diff=+t.getAttribute("data-diff");pack=[];log("難度："+DIFF[S.diff][0],"sys");save();renderAll();return}
+  if(t.classList.contains("btn-learn")){learnSkill(t.getAttribute("data-key"));return}
+  if(t.classList.contains("btn-equip")){doEquip(t.getAttribute("data-id"));return}
+  if(t.classList.contains("btn-unequip")){doUnequip(t.getAttribute("data-slot"));return}
+  if(t.classList.contains("btn-sell-one")){doSellOne(t.getAttribute("data-id"));return}
+  if(t.classList.contains("btn-sell-rar")){doSellByRarity(t.getAttribute("data-rar"));return}
+  if(t.classList.contains("btn-id")){doIdentify(t.getAttribute("data-id"));return}
+  if(t.id==="btnIdAll"){doIdentifyAll();return}
+  if(t.classList.contains("btn-buy")){buyPot(t.getAttribute("data-id"));return}
+  if(t.classList.contains("btn-set")){var sn=t.getAttribute("data-set"),info=SETS_INFO[sn];if(info)showDlg("套裝："+sn,"<b>組成：</b>"+info.pieces.join("、")+"<br><br><b>加成：</b><br>"+info.bonus.join("<br>"));return}
+  if(t.classList.contains("btn-rw")){var rn=t.getAttribute("data-rw");var rw=null;for(var i=0;i<RUNEWORDS.length;i++)if(RUNEWORDS[i].name===rn){rw=RUNEWORDS[i];break}if(rw)showDlg("符文之語："+rw.name,"<b>需要：</b>"+rw.r.join(" + ")+"<br><b>凹槽：</b>"+rw.s+"<br><b>類型：</b>"+rw.d+"<br><br><b>屬性：</b><br>"+Object.keys(rw.m).map(function(k){return fmtAffix(k,rw.m[k])}).join("<br>")+"<br><br><span class='mu'>僅可鑲嵌於白色（普通）有孔裝備</span>");return}
+  if(t.classList.contains("btn-sock")){
+    var iid=t.getAttribute("data-id");
+    if(!S.runes.length){log("沒有符文","warn");return}
+    var names=[];var seen={};S.runes.forEach(function(r){if(!seen[r]){seen[r]=1;names.push(r)}});
+    showDlg("選擇符文鑲嵌",names.map(function(r){return'<button class="sm btn-pick-rune" data-item="'+iid+'" data-rune="'+r+'" style="margin:4px">'+r+'</button>'}).join(" "));
+    return;
+  }
+  if(t.classList.contains("btn-pick-rune")){trySocket(t.getAttribute("data-item"),t.getAttribute("data-rune"));$("overlay").classList.add("hidden");return}
+});
+document.addEventListener("change",function(ev){
+  if(!S)return;var t=ev.target;
+  if(t.classList.contains("auto-sk")){if(!S.auto)S.auto=defAuto();var k=t.getAttribute("data-sk");if(t.checked){if(S.auto.skills.indexOf(k)<0)S.auto.skills.push(k)}else S.auto.skills=S.auto.skills.filter(function(x){return x!==k});save()}
+  if(t.id==="chkReSum"){S.auto.reSummon=t.checked;save()}if(t.id==="chkPref"){S.auto.preferSkill=t.checked;save()}
+  if(t.id==="inpHpTh"){S.auto.hpTh=Math.min(90,Math.max(5,+t.value))/100;save()}if(t.id==="inpMpTh"){S.auto.mpTh=Math.min(90,Math.max(5,+t.value))/100;save()}
+  if(t.classList.contains("loot-sel")){var v=t.value;S.auto.loot[t.getAttribute("data-rar")]=v==="true"?true:v==="false"?false:"sell";save()}
+});
+$("btnCreate").onclick=function(){var name=($("newName").value||"遠征者").trim().slice(0,16);var idx=typeof window._cidx==="number"?window._cidx:slots.findIndex(function(x){return !x});if(idx<0||slots[idx])idx=slots.findIndex(function(x){return !x});if(idx<0){showDlg("提示","欄位已滿");return}slots[idx]=fresh(selClass,name);saveAll();enterSlot(idx)};
+$("btnCancelCreate").onclick=function(){$("createArea").classList.add("hidden")};
+$("btnBack").onclick=function(){askYes("返回角色選擇？",function(){save();active=-1;S=null;pack=[];stopAuto();renderSelect()})};
+$("btnSave").onclick=function(){save();showDlg("提示","已儲存")};
+$("btnExport").onclick=function(){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify({slots:slots,active:active},null,2)],{type:"application/json"}));a.download="深淵遠征-存檔.json";a.click()};
+$("btnImport").onclick=function(){$("fileIn").click()};
+$("fileIn").onchange=function(e){var f=e.target.files[0];if(!f)return;var reader=new FileReader();reader.onload=function(){try{var x=JSON.parse(reader.result);if(x.slots){slots=x.slots;while(slots.length<2)slots.push(null);active=x.active!=null?x.active:-1}else if(x.cid){slots=[x,null];active=0}else throw 0;saveAll();if(active>=0&&slots[active])enterSlot(active);else renderSelect();showDlg("提示","匯入成功")}catch(err){showDlg("錯誤","格式錯誤")}};reader.readAsText(f);e.target.value=""};
+$("btnClearLog").onclick=function(){if(S){S.logs=[];renderLog()}};
+document.querySelectorAll("#tabs button").forEach(function(b){b.onclick=function(){switchTab(b.getAttribute("data-tab"))}});
+$("overlay").addEventListener("click",function(e){if(e.target===$("overlay"))$("overlay").classList.add("hidden")});
+
+load();renderSelect();
+window.addEventListener("pagehide",function(){if(S)save()});
 })();
 </script>
 </body>
