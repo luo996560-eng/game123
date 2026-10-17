@@ -72,7 +72,7 @@ main{max-width:640px;margin:0 auto;padding:8px}
 <body>
 <header>
   <div class="brand">深淵遠征：無燼紀元</div>
-  <div class="sub">v1.0 · 多怪圍攻 · 詞綴抗性 · 專精 · 中文符文</div>
+  <div class="sub">v1.1 · 全職業三系獨立技能 · 技能上限15</div>
 </header>
 <main>
 <section id="charSelect" class="win">
@@ -177,59 +177,280 @@ var TREES={
 
 /* 技能：每系10個，專精限制只能投一系 */
 function buildSkills(cid){
-  var trees=TREES[cid], out=[], generic=[
-    {n:"裂擊",d:"造成2.0倍傷害",t:"attack",req:1,mul:2},
-    {n:"連段",d:"兩次1.0倍傷害",t:"attack",req:3,mul:1,hits:2},
-    {n:"專精",d:"永久主屬性+4%/級",t:"passive",req:2,atkPct:4},
-    {n:"護勢",d:"3回合防禦+25%",t:"buff",req:4,defBuff:0.25,dur:3},
-    {n:"破陣",d:"造成2.6倍傷害",t:"attack",req:6,mul:2.6},
-    {n:"回復",d:"回復16%生命",t:"heal",req:5,healPct:0.16},
-    {n:"強化",d:"永久生命+3%/級",t:"passive",req:7,hpPct:3},
-    {n:"終結",d:"造成3.8倍傷害",t:"attack",req:10,mul:3.8},
-    {n:"戰意",d:"3回合攻擊+22%",t:"buff",req:8,atkBuff:0.22,dur:3},
-    {n:"奧義",d:"造成5.2倍傷害",t:"attack",req:14,mul:5.2}
-  ];
-  var soulSpec={
-    "魂僕軍團":[
-      {n:"召喚骨僕",d:"召喚2隻骨僕（坦克）",t:"summon",req:1,min:{n:"骨僕",c:2,am:0.45,hm:0.55,tank:1}},
-      {n:"墓衛契約",d:"召喚2隻墓衛",t:"summon",req:3,min:{n:"墓衛",c:2,am:0.3,hm:0.95,tank:1}},
-      {n:"魂僕強化",d:"永久召攻+8% 召血+6%/級",t:"passive",req:2,sumAtk:8,sumHp:6},
-      {n:"縫合獸",d:"召喚2隻縫合獸",t:"summon",req:6,min:{n:"縫合獸",c:2,am:0.9,hm:0.6,tank:1}},
-      {n:"亡骸術士",d:"召喚2隻亡骸術士",t:"summon",req:8,min:{n:"亡骸術士",c:2,am:0.75,hm:0.28,tank:0}},
-      {n:"軍團契印",d:"永久召喚上限+2/級",t:"passive",req:5,sumCap:2},
-      {n:"魂鏈共鳴",d:"回復14%生命",t:"heal",req:7,healPct:0.14},
-      {n:"墓穴領主",d:"召喚3隻強化骨僕",t:"summon",req:11,min:{n:"強化骨僕",c:3,am:0.58,hm:0.52,tank:1}},
-      {n:"萬魂歸一",d:"全軍團每隻攻擊×2",t:"spell",req:15,armyBurst:2},
-      {n:"骨僕重塑",d:"永久召血+8%/級",t:"passive",req:4,sumHp:8}
-    ],
-    "衰朽咒文":[
-      {n:"生命凋零",d:"4回合每回合扣敵最大生命8%",t:"dot",req:1,dot:0.08,dotDur:4},
-      {n:"腐敗印記",d:"敵防-25% 3回合",t:"debuff",req:2,defDown:0.25,dur:3},
-      {n:"疫病學識",d:"永久法傷+4%/級",t:"passive",req:3,spellPct:4},
-      {n:"靈魂枯竭",d:"1.8倍法傷汲取30%",t:"spell",req:5,mul:1.8,vamp:0.3},
-      {n:"虛脫詛咒",d:"1.5倍 敵攻-20% 3回合",t:"debuff",req:8,mul:1.5,atkDown:0.2,dur:3},
-      {n:"腐骨侵蝕",d:"2.5倍+3回合重凋零",t:"dot",req:9,mul:2.5,dot:0.12,dotDur:3},
-      {n:"亡者低語",d:"回復20%魔力",t:"heal",req:7,mpPct:0.2},
-      {n:"終焉衰朽",d:"4倍 有凋零再+50%",t:"spell",req:14,mul:4,dotBonus:0.5},
-      {n:"衰朽抗性",d:"永久全抗+3/級",t:"passive",req:4,res:3},
-      {n:"疫病擴散",d:"有凋零則立即結算",t:"dot",req:6,dotExtend:1}
-    ],
-    "骨魂術":[
-      {n:"骨刺穿心",d:"2.1倍骨刺法傷",t:"spell",req:1,mul:2.1},
-      {n:"骨盾環身",d:"護盾=生命20%",t:"shield",req:2,shieldPct:0.2},
-      {n:"骨魂親和",d:"永久法傷+3% 生命+2%/級",t:"passive",req:3,spellPct:3,hpPct:2},
-      {n:"骨牢禁錮",d:"1.4倍 敵攻-35% 2回合",t:"control",req:5,mul:1.4,atkDown:0.35,dur:2},
-      {n:"骸骨尖刺",d:"2.6倍傷害",t:"spell",req:6,mul:2.6},
-      {n:"骨牆壁壘",d:"永久防禦+4%/級",t:"passive",req:4,defPct:4},
-      {n:"骨魂修復",d:"回復18%生命",t:"heal",req:7,healPct:0.18},
-      {n:"骸骨共振",d:"3.8倍骨魂傷害",t:"spell",req:12,mul:3.8},
-      {n:"萬骨朝宗",d:"5.2倍並獲護盾",t:"spell",req:15,mul:5.2,shieldPct:0.15},
-      {n:"魂骨爆破",d:"3.0倍傷害",t:"spell",req:9,mul:3}
-    ]
+  var trees=TREES[cid], out=[];
+  var DATA={
+    iron:{
+      "武器技藝":[
+        {n:"斷鋼重劈",d:"造成2.0倍物理傷害",t:"attack",req:1,mul:2.0},
+        {n:"碎脊震擊",d:"1.6倍傷害並降低敵人防禦18%",t:"debuff",req:1,mul:1.6,defDown:0.18},
+        {n:"武器專精",d:"永久攻擊+3%/級",t:"passive",req:1,atkPct:3},
+        {n:"破甲斬",d:"2.4倍傷害，無視25%防禦",t:"attack",req:4,mul:2.4,pen:0.25},
+        {n:"旋刃奔襲",d:"連續兩次1.15倍傷害",t:"attack",req:6,mul:1.15,hits:2},
+        {n:"不屈意志",d:"永久生命+2.5%、防禦+2%/級",t:"passive",req:3,hpPct:2.5,defPct:2},
+        {n:"萬軍破陣",d:"造成3.2倍物理傷害",t:"attack",req:8,mul:3.2},
+        {n:"戰場鼓舞",d:"3回合攻擊+20%",t:"buff",req:5,atkBuff:0.2,dur:3},
+        {n:"裂地終結",d:"造成4.0倍物理傷害",t:"attack",req:12,mul:4.0},
+        {n:"裂鋼奧義",d:"造成5.5倍物理傷害",t:"attack",req:15,mul:5.5}
+      ],
+      "狂怒戰勢":[
+        {n:"血沸",d:"消耗8%當前生命，3回合攻擊+35%",t:"buff",req:1,hpCost:0.08,atkBuff:0.35,dur:3},
+        {n:"狂怒打擊",d:"造成2.3倍傷害",t:"attack",req:1,mul:2.3},
+        {n:"嗜血本能",d:"永久生命偷取+0.8%/級",t:"passive",req:1,ls:0.8},
+        {n:"怒火中燒",d:"生命低於40%時攻擊額外+15%（被動）",t:"passive",req:4,lowAtk:15},
+        {n:"流血重創",d:"1.5倍傷害並附加3回合流血（每回合6%）",t:"dot",req:5,mul:1.5,dot:0.06,dotDur:3},
+        {n:"狂戰士之心",d:"永久攻擊+4%/級，防禦-1%/級",t:"passive",req:3,atkPct:4,defPct:-1},
+        {n:"血怒爆發",d:"造成3.6倍傷害",t:"attack",req:9,mul:3.6},
+        {n:"不滅狂怒",d:"3回合內每次攻擊回復傷害的4%為生命",t:"buff",req:7,lsBuff:4,dur:3},
+        {n:"滅殺",d:"造成4.6倍傷害",t:"attack",req:12,mul:4.6},
+        {n:"狂戰終章",d:"造成6倍傷害，自身損失8%最大生命",t:"attack",req:16,mul:6,hpCostMax:0.08}
+      ],
+      "戰吼":[
+        {n:"破膽長嘯",d:"敵人攻擊-22%，持續3回合",t:"debuff",req:1,atkDown:0.22,dur:3},
+        {n:"戰場威壓",d:"1.4倍傷害並降低敵人防禦12%",t:"debuff",req:2,mul:1.4,defDown:0.12},
+        {n:"戰意高昂",d:"永久攻擊+2.5%/級",t:"passive",req:1,atkPct:2.5},
+        {n:"鐵壁戰吼",d:"3回合防禦+32%",t:"buff",req:4,defBuff:0.32,dur:3},
+        {n:"震懾咆哮",d:"1.8倍傷害，敵人下回合攻擊-28%",t:"debuff",req:6,mul:1.8,atkDown:0.28,dur:1},
+        {n:"領袖氣場",d:"永久生命+3.5%/級",t:"passive",req:3,hpPct:3.5},
+        {n:"萬軍呼號",d:"造成2.9倍傷害",t:"attack",req:8,mul:2.9},
+        {n:"不敗戰歌",d:"回復18%最大生命",t:"heal",req:5,healPct:0.18},
+        {n:"先祖威勢",d:"3回合攻擊與防禦各+18%",t:"buff",req:11,atkBuff:0.18,defBuff:0.18,dur:3},
+        {n:"萬王戰吼",d:"4倍傷害並使敵人攻擊-30% 2回合",t:"debuff",req:15,mul:4,atkDown:0.3,dur:2}
+      ]
+    },
+    bow:{
+      "弓術":[
+        {n:"穿雲箭",d:"造成2.0倍遠程傷害",t:"attack",req:1,mul:2.0},
+        {n:"雙矢連射",d:"連續兩次1.05倍傷害",t:"attack",req:2,mul:1.05,hits:2},
+        {n:"弓術專精",d:"永久攻擊+3.5%/級",t:"passive",req:1,atkPct:3.5},
+        {n:"裂風箭雨",d:"造成2.5倍傷害",t:"attack",req:5,mul:2.5},
+        {n:"瞄準",d:"下2回合攻擊+28%",t:"buff",req:3,atkBuff:0.28,dur:2},
+        {n:"穩定射擊",d:"永久攻擊+2%、生命+2%/級",t:"passive",req:4,atkPct:2,hpPct:2},
+        {n:"貫星長矢",d:"3.5倍傷害，無視20%防禦",t:"attack",req:9,mul:3.5,pen:0.2},
+        {n:"迅捷換箭",d:"回復12%生命",t:"heal",req:6,healPct:0.12},
+        {n:"日蝕箭幕",d:"造成4.5倍傷害",t:"attack",req:12,mul:4.5},
+        {n:"萬靈箭雨",d:"造成5.5倍傷害",t:"attack",req:15,mul:5.5}
+      ],
+      "獵手本能":[
+        {n:"弱點標記",d:"敵人防禦-22% 3回合",t:"debuff",req:1,defDown:0.22,dur:3},
+        {n:"致命追蹤",d:"1.9倍傷害（對已標記目標更高）",t:"attack",req:2,mul:1.9},
+        {n:"獵手直覺",d:"永久攻擊+2.5%、生命偷取+0.7%/級",t:"passive",req:1,atkPct:2.5,ls:0.7},
+        {n:"毒箭",d:"1.5倍傷害並3回合中毒（每回合7%）",t:"dot",req:4,mul:1.5,dot:0.07,dotDur:3},
+        {n:"陷阱意識",d:"永久防禦+3%/級",t:"passive",req:3,defPct:3},
+        {n:"獵殺時刻",d:"3回合攻擊+24%",t:"buff",req:6,atkBuff:0.24,dur:3},
+        {n:"穿心一擊",d:"造成3.3倍傷害",t:"attack",req:9,mul:3.3},
+        {n:"野外包紮",d:"回復17%生命",t:"heal",req:5,healPct:0.17},
+        {n:"絕殺",d:"造成4.3倍傷害",t:"attack",req:12,mul:4.3},
+        {n:"獵神裁決",d:"造成5.5倍傷害",t:"attack",req:15,mul:5.5}
+      ],
+      "原野盟約":[
+        {n:"自然護佑",d:"3回合防禦+28%",t:"buff",req:1,defBuff:0.28,dur:3},
+        {n:"藤蔓纏繞",d:"1.4倍傷害，敵人攻擊-16% 2回合",t:"debuff",req:2,mul:1.4,atkDown:0.16,dur:2},
+        {n:"原野之心",d:"永久生命+3.5%、抗性+2/級",t:"passive",req:1,hpPct:3.5,res:2},
+        {n:"癒合花粉",d:"回復19%生命",t:"heal",req:4,healPct:0.19},
+        {n:"荊棘護甲",d:"永久防禦+3%/級",t:"passive",req:3,defPct:3},
+        {n:"獸群低語",d:"3回合攻擊與防禦各+14%",t:"buff",req:6,atkBuff:0.14,defBuff:0.14,dur:3},
+        {n:"根鬚穿刺",d:"造成2.9倍傷害",t:"attack",req:8,mul:2.9},
+        {n:"生命湧泉",d:"回復23%生命",t:"heal",req:7,healPct:0.23},
+        {n:"古木守護",d:"獲得護盾（最大生命26%）",t:"shield",req:11,shieldPct:0.26},
+        {n:"原野之怒",d:"造成4.6倍傷害",t:"attack",req:15,mul:4.6}
+      ]
+    },
+    mage:{
+      "炎紋":[
+        {n:"燼火矢",d:"2.0倍火焰法傷",t:"spell",req:1,mul:2.0,ele:"fire"},
+        {n:"燃盡",d:"附加3回合燃燒（每回合6%最大生命）",t:"dot",req:1,dot:0.06,dotDur:3,ele:"fire"},
+        {n:"炎紋專精",d:"永久火焰加成+4%、法傷+2%/級",t:"passive",req:1,firePct:4,spellPct:2},
+        {n:"熔核迸裂",d:"2.8倍火焰法傷",t:"spell",req:5,mul:2.8,ele:"fire"},
+        {n:"烈焰護體",d:"3回合防禦+16%",t:"buff",req:4,defBuff:0.16,dur:3},
+        {n:"火脈沸騰",d:"永久法傷+3.5%/級",t:"passive",req:3,spellPct:3.5},
+        {n:"隕石墜擊",d:"3.6倍火焰法傷",t:"spell",req:9,mul:3.6,ele:"fire"},
+        {n:"炎息",d:"回復16%魔力",t:"heal",req:6,mpPct:0.16},
+        {n:"隕星災炎",d:"5倍火焰法傷",t:"spell",req:12,mul:5.0,ele:"fire"},
+        {n:"煉獄終章",d:"6倍火焰法傷並附加燃燒",t:"spell",req:16,mul:6.0,ele:"fire",dot:0.08,dotDur:3}
+      ],
+      "霜界":[
+        {n:"霜矢",d:"1.9倍冰冷法傷",t:"spell",req:1,mul:1.9,ele:"cold"},
+        {n:"霜縛",d:"1.3倍傷害，敵人攻擊-20% 2回合",t:"debuff",req:1,mul:1.3,atkDown:0.2,dur:2,ele:"cold"},
+        {n:"霜界專精",d:"永久冰冷加成+4%、防禦+2%/級",t:"passive",req:1,coldPct:4,defPct:2},
+        {n:"冰晶刺",d:"2.5倍冰冷法傷",t:"spell",req:5,mul:2.5,ele:"cold"},
+        {n:"冰晶屏障",d:"獲得護盾（最大生命18%）",t:"shield",req:4,shieldPct:0.18},
+        {n:"永凍之心",d:"永久法傷+3%、生命+2%/級",t:"passive",req:3,spellPct:3,hpPct:2},
+        {n:"暴風雪",d:"3.3倍冰冷法傷",t:"spell",req:9,mul:3.3,ele:"cold"},
+        {n:"霜療",d:"回復15%生命",t:"heal",req:6,healPct:0.15},
+        {n:"絕對零度",d:"4.5倍冰冷法傷，敵人攻擊-30% 2回合",t:"debuff",req:12,mul:4.5,atkDown:0.3,dur:2,ele:"cold"},
+        {n:"霜界終焉",d:"5.5倍冰冷法傷",t:"spell",req:16,mul:5.5,ele:"cold"}
+      ],
+      "雷序":[
+        {n:"弧光",d:"1.85倍雷電法傷",t:"spell",req:1,mul:1.85,ele:"light"},
+        {n:"感電",d:"目標下2次受到傷害+15%",t:"debuff",req:1,vuln:0.15,dur:2},
+        {n:"雷序專精",d:"永久雷電加成+4%、法傷+2.5%/級",t:"passive",req:1,lightPct:4,spellPct:2.5},
+        {n:"雷矛貫穿",d:"2.7倍雷電法傷",t:"spell",req:5,mul:2.7,ele:"light"},
+        {n:"靜電護盾",d:"3回合防禦+20%",t:"buff",req:4,defBuff:0.2,dur:3},
+        {n:"雷脈",d:"永久法傷+3.5%、魔力+2.5%/級",t:"passive",req:3,spellPct:3.5,mpPct:2.5},
+        {n:"連鎖閃電",d:"3.4倍雷電法傷",t:"spell",req:9,mul:3.4,ele:"light"},
+        {n:"充能",d:"回復20%魔力",t:"heal",req:6,mpPct:0.2},
+        {n:"天穹雷獄",d:"5倍雷電法傷",t:"spell",req:12,mul:5.0,ele:"light"},
+        {n:"雷罰",d:"6倍雷電法傷",t:"spell",req:16,mul:6.0,ele:"light"}
+      ]
+    },
+    soul:{
+      "魂僕軍團":[
+        {n:"召喚骨僕",d:"召喚2隻骨僕（坦克，優先承傷）",t:"summon",req:1,min:{n:"骨僕",c:2,am:0.45,hm:0.55,tank:1}},
+        {n:"墓衛契約",d:"召喚2隻墓衛（高血坦克）",t:"summon",req:3,min:{n:"墓衛",c:2,am:0.3,hm:0.95,tank:1}},
+        {n:"魂僕強化",d:"永久召喚傷害+7%、生命+5%/級",t:"passive",req:1,sumAtk:7,sumHp:5},
+        {n:"縫合獸",d:"召喚2隻縫合獸（高攻近戰）",t:"summon",req:6,min:{n:"縫合獸",c:2,am:0.9,hm:0.6,tank:1}},
+        {n:"亡骸術士",d:"召喚2隻亡骸術士（遠程法傷）",t:"summon",req:8,min:{n:"亡骸術士",c:2,am:0.75,hm:0.28,tank:0}},
+        {n:"軍團契印",d:"永久召喚上限+2/級",t:"passive",req:5,sumCap:2},
+        {n:"魂鏈共鳴",d:"回復14%最大生命",t:"heal",req:7,healPct:0.14},
+        {n:"墓穴領主",d:"召喚3隻強化骨僕",t:"summon",req:11,min:{n:"強化骨僕",c:3,am:0.58,hm:0.52,tank:1}},
+        {n:"萬魂歸一",d:"全軍團每隻僕從造成其攻擊×2的傷害",t:"spell",req:15,armyBurst:2},
+        {n:"骨僕重塑",d:"永久召喚生命+7%/級",t:"passive",req:4,sumHp:7}
+      ],
+      "衰朽咒文":[
+        {n:"生命凋零",d:"4回合每回合扣敵最大生命8%",t:"dot",req:1,dot:0.08,dotDur:4},
+        {n:"腐敗印記",d:"敵人防禦-25% 持續3回合",t:"debuff",req:2,defDown:0.25,dur:3},
+        {n:"疫病學識",d:"永久法傷+3.5%/級",t:"passive",req:1,spellPct:3.5},
+        {n:"靈魂枯竭",d:"1.8倍法傷並汲取30%為生命",t:"spell",req:5,mul:1.8,vamp:0.3},
+        {n:"虛脫詛咒",d:"1.5倍法傷，敵人攻擊-20% 3回合",t:"debuff",req:8,mul:1.5,atkDown:0.2,dur:3},
+        {n:"腐骨侵蝕",d:"2.5倍傷害並附加3回合重凋零12%",t:"dot",req:9,mul:2.5,dot:0.12,dotDur:3},
+        {n:"亡者低語",d:"回復20%魔力",t:"heal",req:7,mpPct:0.2},
+        {n:"終焉衰朽",d:"4倍法傷，若目標有凋零再+50%",t:"spell",req:14,mul:4,dotBonus:0.5},
+        {n:"衰朽抗性",d:"永久全抗+2.5/級",t:"passive",req:4,res:2.5},
+        {n:"疫病擴散",d:"若敵人已有凋零，立即結算一次並延長1回合",t:"dot",req:6,dotExtend:1}
+      ],
+      "骨魂術":[
+        {n:"骨刺穿心",d:"2.1倍骨刺法傷",t:"spell",req:1,mul:2.1},
+        {n:"骨盾環身",d:"獲得護盾（最大生命20%）",t:"shield",req:2,shieldPct:0.2},
+        {n:"骨魂親和",d:"永久法傷+3%、生命+2%/級",t:"passive",req:1,spellPct:3,hpPct:2},
+        {n:"骨牢禁錮",d:"1.4倍傷害，敵人攻擊-35% 2回合",t:"control",req:5,mul:1.4,atkDown:0.35,dur:2},
+        {n:"骸骨尖刺",d:"2.6倍傷害",t:"spell",req:6,mul:2.6},
+        {n:"骨牆壁壘",d:"永久防禦+3.5%/級",t:"passive",req:4,defPct:3.5},
+        {n:"骨魂修復",d:"回復18%最大生命",t:"heal",req:7,healPct:0.18},
+        {n:"骸骨共振",d:"3.8倍骨魂傷害",t:"spell",req:12,mul:3.8},
+        {n:"萬骨朝宗",d:"5.2倍傷害並獲得15%生命護盾",t:"spell",req:15,mul:5.2,shieldPct:0.15},
+        {n:"魂骨爆破",d:"3.0倍傷害",t:"spell",req:9,mul:3.0}
+      ]
+    },
+    shade:{
+      "刃舞":[
+        {n:"影切",d:"造成2.05倍傷害",t:"attack",req:1,mul:2.05},
+        {n:"三段追擊",d:"連續三次0.8倍傷害",t:"attack",req:2,mul:0.8,hits:3},
+        {n:"刃舞精通",d:"永久攻擊+3.5%/級",t:"passive",req:1,atkPct:3.5},
+        {n:"旋影割裂",d:"造成2.45倍傷害",t:"attack",req:5,mul:2.45},
+        {n:"背光刺殺",d:"造成2.9倍傷害",t:"attack",req:7,mul:2.9},
+        {n:"影刃淬鍊",d:"永久攻擊+2.5%、生命偷取+0.8%/級",t:"passive",req:3,atkPct:2.5,ls:0.8},
+        {n:"暮星斬",d:"造成3.6倍傷害",t:"attack",req:9,mul:3.6},
+        {n:"影步回血",d:"回復13%生命",t:"heal",req:6,healPct:0.13},
+        {n:"千影連斬",d:"造成4.6倍傷害",t:"attack",req:12,mul:4.6},
+        {n:"影殺奧義",d:"造成5.6倍傷害",t:"attack",req:15,mul:5.6}
+      ],
+      "機括陷阱":[
+        {n:"裂電機括",d:"布置陷阱：下回合敵人額外受1.9倍傷害",t:"trap",req:1,mul:1.9},
+        {n:"毒霧陷阱",d:"1.4倍傷害並3回合中毒",t:"dot",req:2,mul:1.4,dot:0.09,dotDur:3},
+        {n:"機括精通",d:"永久攻擊+3%/級",t:"passive",req:1,atkPct:3},
+        {n:"終末哨戒",d:"造成2.55倍傷害",t:"attack",req:5,mul:2.55},
+        {n:"麻痺機關",d:"敵人攻擊-26% 2回合",t:"debuff",req:4,atkDown:0.26,dur:2},
+        {n:"陷阱專精",d:"永久防禦+2.5%、抗性+2/級",t:"passive",req:3,defPct:2.5,res:2},
+        {n:"連環爆裂",d:"造成3.3倍傷害",t:"attack",req:9,mul:3.3},
+        {n:"隱匿包紮",d:"回復16%生命",t:"heal",req:6,healPct:0.16},
+        {n:"殺陣",d:"造成4.3倍傷害",t:"attack",req:12,mul:4.3},
+        {n:"終末機關",d:"造成5.5倍傷害",t:"attack",req:15,mul:5.5}
+      ],
+      "影之身法":[
+        {n:"鏡影替身",d:"獲得護盾（最大生命16%）",t:"shield",req:1,shieldPct:0.16},
+        {n:"影遁",d:"3回合防禦+32%",t:"buff",req:2,defBuff:0.32,dur:3},
+        {n:"身法精通",d:"永久防禦+3%、生命+2%/級",t:"passive",req:1,defPct:3,hpPct:2},
+        {n:"虛晃一擊",d:"1.6倍傷害，自身防禦+12% 2回合",t:"buff",req:4,mul:1.6,defBuff:0.12,dur:2},
+        {n:"影分身",d:"造成2.25倍傷害",t:"attack",req:6,mul:2.25},
+        {n:"暗影韌性",d:"永久生命+3.5%/級",t:"passive",req:3,hpPct:3.5},
+        {n:"千影化身",d:"造成3.1倍傷害",t:"attack",req:9,mul:3.1},
+        {n:"影愈",d:"回復21%生命",t:"heal",req:7,healPct:0.21},
+        {n:"虛空步",d:"3回合攻防各+18%",t:"buff",req:11,atkBuff:0.18,defBuff:0.18,dur:3},
+        {n:"影之極意",d:"5倍傷害並獲得12%生命護盾",t:"spell",req:15,mul:5.0,shieldPct:0.12}
+      ]
+    },
+    wild:{
+      "風暴之語":[
+        {n:"裂風術",d:"1.95倍自然法傷",t:"spell",req:1,mul:1.95},
+        {n:"藤雷旋流",d:"1.5倍傷害，敵人攻擊-15% 2回合",t:"debuff",req:2,mul:1.5,atkDown:0.15,dur:2},
+        {n:"風暴親和",d:"永久法傷+3.5%/級",t:"passive",req:1,spellPct:3.5},
+        {n:"岩脈震擊",d:"2.55倍傷害",t:"attack",req:5,mul:2.55},
+        {n:"天穹風暴",d:"3.1倍自然法傷",t:"spell",req:7,mul:3.1},
+        {n:"元素根基",d:"永久法傷+2.5%、抗性+2/級",t:"passive",req:3,spellPct:2.5,res:2},
+        {n:"雷暴降臨",d:"3.9倍法傷",t:"spell",req:10,mul:3.9},
+        {n:"自然回能",d:"回復18%魔力",t:"heal",req:6,mpPct:0.18},
+        {n:"世界樹之怒",d:"5倍自然法傷",t:"spell",req:13,mul:5.0},
+        {n:"終末風暴",d:"6倍自然法傷",t:"spell",req:16,mul:6.0}
+      ],
+      "獸形盟約":[
+        {n:"狼形戰勢",d:"3回合攻擊+30%",t:"buff",req:1,atkBuff:0.3,dur:3},
+        {n:"熊形守勢",d:"3回合防禦+36%",t:"buff",req:1,defBuff:0.36,dur:3},
+        {n:"獸魂",d:"永久攻擊+2.5%、生命+2.5%/級",t:"passive",req:1,atkPct:2.5,hpPct:2.5},
+        {n:"獸爪裂擊",d:"2.65倍傷害",t:"attack",req:5,mul:2.65},
+        {n:"召喚烏鴉",d:"召喚3隻烏鴉協助作戰",t:"summon",req:3,min:{n:"烏鴉",c:3,am:0.3,hm:0.22,tank:0}},
+        {n:"野性韌性",d:"永久生命+3.5%、防禦+2%/級",t:"passive",req:4,hpPct:3.5,defPct:2},
+        {n:"狂爪連擊",d:"連續兩次1.45倍傷害",t:"attack",req:9,mul:1.45,hits:2},
+        {n:"獸血再生",d:"回復20%生命",t:"heal",req:6,healPct:0.2},
+        {n:"巨獸形態",d:"3回合攻防各+24%",t:"buff",req:12,atkBuff:0.24,defBuff:0.24,dur:3},
+        {n:"野獸之王",d:"造成5.2倍傷害",t:"attack",req:15,mul:5.2}
+      ],
+      "自然之靈":[
+        {n:"根脈療癒",d:"回復17%生命",t:"heal",req:1,healPct:0.17},
+        {n:"荊棘護體",d:"3回合防禦+22%",t:"buff",req:2,defBuff:0.22,dur:3},
+        {n:"自然恩惠",d:"永久生命+3.5%、回血+1/級",t:"passive",req:1,hpPct:3.5,regen:1},
+        {n:"藤蔓束縛",d:"1.5倍傷害，敵人攻擊-20% 2回合",t:"debuff",req:4,mul:1.5,atkDown:0.2,dur:2},
+        {n:"生命之種",d:"回復23%生命",t:"heal",req:5,healPct:0.23},
+        {n:"森林守護",d:"永久防禦+3.5%、抗性+2/級",t:"passive",req:3,defPct:3.5,res:2},
+        {n:"古木穿刺",d:"造成3.1倍傷害",t:"attack",req:9,mul:3.1},
+        {n:"靈泉",d:"回復26%生命與12%魔力",t:"heal",req:7,healPct:0.26,mpPct:0.12},
+        {n:"古木屏障",d:"獲得護盾（最大生命28%）",t:"shield",req:12,shieldPct:0.28},
+        {n:"自然審判",d:"造成5倍自然法傷",t:"spell",req:15,mul:5.0}
+      ]
+    },
+    oath:{
+      "聖裁武技":[
+        {n:"誓光重擊",d:"2.05倍神聖傷害",t:"attack",req:1,mul:2.05},
+        {n:"破邪衝鋒",d:"2.55倍傷害",t:"attack",req:3,mul:2.55},
+        {n:"聖裁專精",d:"永久攻擊+3.5%/級",t:"passive",req:1,atkPct:3.5},
+        {n:"盾反裁決",d:"1.85倍傷害，3回合防禦+20%",t:"buff",req:5,mul:1.85,defBuff:0.2,dur:3},
+        {n:"信念打擊",d:"2.85倍傷害",t:"attack",req:7,mul:2.85},
+        {n:"武技鍛鍊",d:"永久攻擊+2.5%、防禦+2%/級",t:"passive",req:2,atkPct:2.5,defPct:2},
+        {n:"天律裁決",d:"4.1倍神聖傷害",t:"spell",req:11,mul:4.1},
+        {n:"聖光小憩",d:"回復15%生命",t:"heal",req:6,healPct:0.15},
+        {n:"最終審判",d:"5.1倍神聖傷害",t:"spell",req:14,mul:5.1},
+        {n:"神裁",d:"6倍神聖傷害",t:"spell",req:16,mul:6.0}
+      ],
+      "守護靈光":[
+        {n:"堅毅靈光",d:"永久防禦+3.5%/級",t:"passive",req:1,defPct:3.5},
+        {n:"聖盾",d:"獲得護盾（最大生命22%）",t:"shield",req:1,shieldPct:0.22},
+        {n:"守護誓言",d:"永久生命+3.5%、抗性+2.5/級",t:"passive",req:2,hpPct:3.5,res:2.5},
+        {n:"鐵壁姿態",d:"3回合防禦+40%",t:"buff",req:4,defBuff:0.4,dur:3},
+        {n:"回生靈光",d:"回復21%生命",t:"heal",req:3,healPct:0.21},
+        {n:"聖光韌性",d:"永久生命+2.5%、防禦+2.5%/級",t:"passive",req:5,hpPct:2.5,defPct:2.5},
+        {n:"無畏守護",d:"3回合防禦+24%、攻擊+10%",t:"buff",req:8,defBuff:0.24,atkBuff:0.1,dur:3},
+        {n:"聖光療癒",d:"回復28%生命",t:"heal",req:7,healPct:0.28},
+        {n:"絕對壁壘",d:"獲得護盾（最大生命35%）",t:"shield",req:12,shieldPct:0.35},
+        {n:"永恆守護",d:"回復35%生命並獲得15%生命護盾",t:"heal",req:15,healPct:0.35,shieldPct:0.15}
+      ],
+      "懲戒靈光":[
+        {n:"烈陽靈光",d:"3回合攻擊+26%",t:"buff",req:1,atkBuff:0.26,dur:3},
+        {n:"懲戒之擊",d:"2.15倍神聖傷害",t:"spell",req:2,mul:2.15},
+        {n:"懲戒專精",d:"永久法傷+3.5%、攻擊+2%/級",t:"passive",req:1,spellPct:3.5,atkPct:2},
+        {n:"聖火灼燒",d:"1.6倍傷害並3回合燃燒",t:"dot",req:4,mul:1.6,dot:0.07,dotDur:3},
+        {n:"信念裁定",d:"3回合攻擊+20%",t:"buff",req:5,atkBuff:0.2,dur:3},
+        {n:"光輝之力",d:"永久攻擊+2.5%、法傷+2.5%/級",t:"passive",req:3,atkPct:2.5,spellPct:2.5},
+        {n:"天譴",d:"3.6倍神聖傷害",t:"spell",req:9,mul:3.6},
+        {n:"光之息",d:"回復15%生命與魔力",t:"heal",req:6,healPct:0.15,mpPct:0.15},
+        {n:"終審",d:"4.9倍神聖傷害",t:"spell",req:12,mul:4.9},
+        {n:"神罰降臨",d:"6倍神聖傷害",t:"spell",req:16,mul:6.0}
+      ]
+    }
   };
+  var data=DATA[cid];
+  if(!data)return out;
   for(var ti=0;ti<trees.length;ti++){
     var tr=trees[ti];
-    var list=(cid==="soul"&&soulSpec[tr])?soulSpec[tr]:generic;
+    var list=data[tr]||[];
     for(var j=0;j<list.length;j++){
       var s=list[j];
       out.push(Object.assign({key:tr+"::"+s.n,tree:tr},s));
@@ -744,7 +965,7 @@ function trySocket(itemId,runeId){
 
 function learnSkill(key){
   var sk=getSkill(key);if(!sk)return;var n=S.skills[key]||0;
-  if(S.sp<1){log("技能點不足","warn");return}if(S.lv<sk.req){log("需等級 "+sk.req,"warn");return}if(n>=5){log("已滿級","warn");return}
+  if(S.sp<1){log("技能點不足","warn");return}if(S.lv<sk.req){log("需等級 "+sk.req,"warn");return}if(n>=15){log("已滿級","warn");return}
   if(S.specTree&&S.specTree!==sk.tree){log("你已專精「"+S.specTree+"」，無法學習其他系技能","warn");return}
   if(!S.specTree)S.specTree=sk.tree;
   S.skills[key]=n+1;S.sp--;
@@ -860,7 +1081,7 @@ function renderSkills(){
         list.filter(function(s){return s.tree===tr}).map(function(s){
           var n=S.skills[s.key]||0;
           return'<div class="sk-card" style="'+(locked?"opacity:0.5":"")+'"><div style="color:var(--b);font-weight:600">'+s.n+'</div>'+
-            '<div class="mu">Lv'+n+'/5 · 需'+s.req+' · '+s.t+(s.t==="passive"?" · 常駐":"")+'</div>'+
+            '<div class="mu">Lv'+n+'/15 · 需'+s.req+' · '+s.t+(s.t==="passive"?" · 常駐":"")+'</div>'+
             '<div class="mu">'+s.d+'</div>'+
             '<button class="sm btn-learn" data-key="'+s.key+'" style="margin-top:6px"'+(locked?" disabled":"")+'>'+(n?"強化":"學習")+'</button></div>';
         }).join("")+'</div>';
