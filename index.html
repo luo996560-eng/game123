@@ -72,12 +72,26 @@ main{max-width:640px;margin:0 auto;padding:8px}
 <body>
 <header>
   <div class="brand">深淵遠征：無燼紀元</div>
-  <div class="sub">v1.1 · 全職業三系獨立技能 · 技能上限15</div>
+  <div class="sub">v1.3.1 · 更新公告 · 賭坊低消 · 符文之語均衡</div>
 </header>
 <main>
 <section id="charSelect" class="win">
   <div class="wt">選擇角色（最多2名）</div>
   <div class="wb" id="slotList"></div>
+  <div class="wb" id="updateNotice" style="border-top:1px solid var(--ln)">
+    <div style="color:var(--g);font-weight:600;margin-bottom:6px">系統更新公告 · v1.3.1</div>
+    <div class="mu" style="font-size:12px;line-height:1.55">
+      • 抗性、減傷與裝備詞綴已全面接入戰鬥計算<br>
+      • 技能等級成長強化；召喚隨技能等級顯著變強<br>
+      • 套裝改為九件全身，3／6／9件分階加成<br>
+      • 符文編號 #1～#33；符文之語可至六孔，洞數須完全吻合<br>
+      • 商人新增「黑市賭坊」：賭裝備／武器／符文<br>
+      • 存檔匯出含完整性簽章；非法修改匯入將被拒絕且保留原檔<br>
+      • 離線結算可獲得裝備；鑑定無卷軸時可自動扣金代購<br>
+      • 修復角色選擇與部分按鈕無反應問題<br>
+      • 優化介面與自動戰鬥設定
+    </div>
+  </div>
   <div id="createArea" class="wb hidden">
     <div class="mu" style="margin-bottom:4px">角色名稱</div>
     <input id="newName" value="遠征者" maxlength="16" style="width:100%;margin-bottom:10px">
@@ -140,6 +154,76 @@ var rnd=function(a,b){return Math.floor(Math.random()*(b-a+1))+a};
 var pick=function(a){return a[Math.floor(Math.random()*a.length)]};
 var uid=function(){return Math.random().toString(36).slice(2,9)};
 var esc=function(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")};
+
+/* === 存檔安全核心 schema v2 === */
+var SAVE_FORMAT="abyss-save", SCHEMA_VERSION=2, SAVE_KEY="abyss_hmac_client_v2", BACKUP_KEY="abyss_v10_backups", MAX_BACKUPS=3;
+function goldCap(lv){return Math.min(500000000,5000+lv*lv*800)}
+function stableStringify(obj){
+  if(obj===null||typeof obj!=="object")return JSON.stringify(obj);
+  if(Array.isArray(obj))return "["+obj.map(stableStringify).join(",")+"]";
+  var keys=Object.keys(obj).sort();
+  return "{"+keys.map(function(k){return JSON.stringify(k)+":"+stableStringify(obj[k])}).join(",")+"}";
+}
+function simpleHmac(str,key){
+  var s=key+"|"+str+"|"+key,h1=2166136261,h2=0x811c9dc5;
+  for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);h1^=c;h1=(h1*16777619)>>>0;h2=((h2<<5)+h2+c)>>>0}
+  return ("00000000"+h1.toString(16)).slice(-8)+("00000000"+h2.toString(16)).slice(-8);
+}
+function signPayload(dataObj){return simpleHmac(stableStringify(dataObj),SAVE_KEY)}
+function pushBackup(snapshot){
+  try{var arr=JSON.parse(localStorage.getItem(BACKUP_KEY)||"[]");if(!Array.isArray(arr))arr=[];arr.unshift({at:Date.now(),data:snapshot});localStorage.setItem(BACKUP_KEY,JSON.stringify(arr.slice(0,MAX_BACKUPS)))}catch(e){}
+}
+function validateCharacter(ch,idx){
+  var errs=[];
+  if(!ch||typeof ch!=="object"){errs.push("欄位"+idx+"非物件");return errs}
+  if(typeof ch.name!=="string"||!ch.name.trim())errs.push("欄位"+idx+"名稱無效");
+  if(typeof CLASSES==="undefined"||!CLASSES[ch.cid])errs.push("欄位"+idx+"職業無效");
+  var lv=ch.lv|0; if(lv<1||lv>MAX_LV)errs.push("欄位"+idx+"等級越界:"+lv);
+  if(typeof ch.gold!=="number"||!isFinite(ch.gold)||ch.gold<0)errs.push("欄位"+idx+"金幣無效");
+  else if(ch.gold>goldCap(lv)*3)errs.push("欄位"+idx+"金幣異常偏高");
+  if(typeof ch.xp!=="number"||!isFinite(ch.xp)||ch.xp<0)errs.push("欄位"+idx+"經驗無效");
+  if(typeof ch.sp!=="number"||ch.sp<0||ch.sp>MAX_LV+5)errs.push("欄位"+idx+"技能點異常");
+  if(typeof ch.ap!=="number"||ch.ap<0||ch.ap>MAX_LV+5)errs.push("欄位"+idx+"屬性點異常");
+  var sk=ch.skills||{}, trees={};
+  Object.keys(sk).forEach(function(k){var n=sk[k]|0;if(n<0||n>15)errs.push("技能等級非法:"+k);var t=k.split("::")[0];if(t)trees[t]=1});
+  if(Object.keys(trees).length>1)errs.push("欄位"+idx+"違反專精（跨系）");
+  if(!Array.isArray(ch.items))errs.push("欄位"+idx+"背包非陣列");
+  else if(ch.items.length>500)errs.push("欄位"+idx+"背包過多");
+  if(Array.isArray(ch.minions)&&ch.minions.length>20)errs.push("欄位"+idx+"召喚過多");
+  return errs;
+}
+function validateSaveData(data){
+  var errs=[];
+  if(!data||typeof data!=="object")return["根物件無效"];
+  if(!Array.isArray(data.slots))errs.push("slots必須為陣列");
+  else{if(data.slots.length>2)errs.push("角色欄超過2");data.slots.forEach(function(ch,i){if(ch)errs=errs.concat(validateCharacter(ch,i))})}
+  if(data.active!=null&&data.active!==-1&&(data.active<0||data.active>1))errs.push("active非法");
+  return errs;
+}
+function buildExportPackage(){
+  var data={slots:slots,active:active,schemaVersion:SCHEMA_VERSION};
+  return{format:SAVE_FORMAT,schemaVersion:SCHEMA_VERSION,exportedAt:new Date().toISOString(),data:data,sig:signPayload(data)};
+}
+function tryImportPackage(obj){
+  if(!obj||typeof obj!=="object")return{ok:false,errors:["無法解析"]};
+  if(obj.format===SAVE_FORMAT){
+    if(obj.schemaVersion!==SCHEMA_VERSION&&obj.schemaVersion!==1)return{ok:false,errors:["不支援schemaVersion:"+obj.schemaVersion]};
+    if(!obj.data)return{ok:false,errors:["缺少data"]};
+    if(!obj.sig||obj.sig!==signPayload(obj.data))return{ok:false,errors:["完整性簽章不符（可能被修改）"]};
+    var ve=validateSaveData(obj.data); if(ve.length)return{ok:false,errors:ve};
+    return{ok:true,errors:[],data:obj.data};
+  }
+  if(obj.slots){
+    var ve2=validateSaveData(obj); if(ve2.length)return{ok:false,errors:ve2};
+    return{ok:true,errors:[],data:obj,legacy:true};
+  }
+  if(obj.cid){
+    var wrap={slots:[obj,null],active:0}; var ve3=validateSaveData(wrap);
+    if(ve3.length)return{ok:false,errors:ve3}; return{ok:true,errors:[],data:wrap,legacy:true};
+  }
+  return{ok:false,errors:["無法識別存檔格式"]};
+}
+
 
 function showDlg(title,body,buttons){
   $("dlgTitle").textContent=title;
@@ -459,68 +543,171 @@ function buildSkills(cid){
   return out;
 }
 
-var AFFIX_CN={atk:"攻擊",spell:"法術傷害",def:"防禦",fire:"火焰傷害",cold:"冰冷傷害",light:"閃電傷害",poison:"毒素傷害",holy:"神聖傷害",str:"力量",dex:"敏捷",hp:"生命",mp:"魔力",res:"全抗性",atkPct:"攻擊加成",spellPct:"法術加成",defPct:"防禦加成",hpPct:"生命加成",mpPct:"魔力加成",firePct:"火焰加成",coldPct:"冰冷加成",lightPct:"閃電加成",lifeRegen:"生命恢復",lifeSteal:"生命偷取",summonAtk:"召喚物攻擊",summonHp:"召喚物生命",summonCap:"召喚上限",fireRes:"火焰抗性",coldRes:"冰冷抗性",lightRes:"閃電抗性",poisonRes:"毒素抗性",curseRes:"詛咒抗性"};
+var AFFIX_CN={atk:"攻擊",spell:"法術傷害",def:"防禦",fire:"火焰傷害",cold:"冰冷傷害",light:"閃電傷害",poison:"毒素傷害",holy:"神聖傷害",str:"力量",dex:"敏捷",hp:"生命",mp:"魔力",res:"全抗性",atkPct:"攻擊加成",spellPct:"法術加成",defPct:"防禦加成",hpPct:"生命加成",mpPct:"魔力加成",firePct:"火焰加成",coldPct:"冰冷加成",lightPct:"閃電加成",lifeRegen:"生命恢復",lifeSteal:"生命偷取",summonAtk:"召喚物攻擊",summonHp:"召喚物生命",summonCap:"召喚上限",fireRes:"火焰抗性",coldRes:"冰冷抗性",lightRes:"閃電抗性",poisonRes:"毒素抗性",curseRes:"詛咒抗性",allSkills:"全技能",classSkills:"職業技能",fhr:"受擊恢復",frw:"移動速度",mf:"魔法尋找",gf:"金幣尋找",dr:"物理減傷",cdr:"冷卻縮減",manaOnKill:"擊殺回魔",lifeOnKill:"擊殺回血"};
 function fmtAffix(k,v){var n=AFFIX_CN[k]||k;var p=(k.indexOf("Pct")>=0||k.indexOf("Res")>=0||k==="lifeSteal")?"%":"";return n+" +"+v+p}
 
-var PRE=[["強力的",{atk:[3,8]},1],["鋒利的",{atkPct:[4,12]},1],["堅韌的",{def:[3,8],hp:[6,16]},1],["迅捷的",{dex:[2,7]},1],["活力的",{hp:[10,22]},1],["灼傷的",{fire:[3,10]},1],["冰結的",{cold:[3,10]},1],["電擊的",{light:[3,10]},1],["烈焰的",{firePct:[10,20]},2],["霜寒的",{coldPct:[10,20]},2],["雷霆的",{lightPct:[10,20]},2],["猛擊的",{atkPct:[10,18]},2],["守護的",{defPct:[10,20],res:[4,10]},2],["抗火的",{fireRes:[8,18]},2],["抗冰的",{coldRes:[8,18]},2],["抗雷的",{lightRes:[8,18]},2],["煉獄的",{firePct:[16,30],atkPct:[8,14]},3],["不朽的",{hpPct:[14,28],defPct:[12,22]},3],["深淵的",{spellPct:[14,30],res:[8,16]},3],["屠戮的",{atkPct:[16,30],lifeSteal:[2,5]},3]];
-var SUF=[["之力量",{str:[3,10]},1],["之敏捷",{dex:[3,10]},1],["之耐力",{hp:[8,20]},1],["之守護",{def:[3,10]},1],["之火花",{fire:[3,9]},1],["之恢復",{lifeRegen:[1,3]},1],["之烈焰",{firePct:[10,20]},2],["之掠奪",{lifeSteal:[2,5]},2],["之抗衡",{res:[6,14]},2],["之法能",{spellPct:[8,16]},2],["之永生",{hpPct:[16,30],lifeRegen:[2,5]},3],["之毀滅",{atkPct:[18,34],lifeSteal:[3,6]},3]];
+var PRE=[
+["強力的",{atk:[4,12]},1],["鋒利的",{atkPct:[5,14]},1],["堅韌的",{def:[4,12],hp:[8,20]},1],
+["迅捷的",{dex:[3,9]},1],["活力的",{hp:[12,28]},1],["灼傷的",{fire:[4,14]},1],
+["冰結的",{cold:[4,14]},1],["電擊的",{light:[4,14]},1],["劇毒的",{poison:[4,12]},1],
+["烈焰的",{firePct:[12,24]},2],["霜寒的",{coldPct:[12,24]},2],["雷霆的",{lightPct:[12,24]},2],
+["猛擊的",{atkPct:[12,22]},2],["守護的",{defPct:[12,24],res:[5,12]},2],
+["抗火的",{fireRes:[10,22]},2],["抗冰的",{coldRes:[10,22]},2],["抗雷的",{lightRes:[10,22]},2],
+["抗毒的",{poisonRes:[10,20]},2],["抗咒的",{curseRes:[8,18]},2],["均衡的",{res:[6,14]},2],
+["煉獄的",{firePct:[18,32],atkPct:[10,16]},3],["不朽的",{hpPct:[16,30],defPct:[14,24]},3],
+["深淵的",{spellPct:[16,32],res:[10,18]},3],["屠戮的",{atkPct:[18,34],lifeSteal:[3,6]},3],
+["賢者的",{spellPct:[14,28],mpPct:[10,20]},3],["軍團的",{summonAtk:[12,24],summonHp:[10,20]},3],
+["掠奪的",{mf:[8,20],gf:[10,25]},2],["疾風的",{frw:[5,12]},1],["回復的",{lifeRegen:[2,5]},2]
+];
+var MID=["銅","鐵","鋼","秘銀","黑曜","星晶","霜紋","炎紋","雷紋","虛空","古木","血鑄","影織","聖輝","骨紋","裂谷","無燼","蒼穹"];
+var SUF=[
+["之力量",{str:[4,12]},1],["之敏捷",{dex:[4,12]},1],["之耐力",{hp:[10,24]},1],
+["之守護",{def:[4,12]},1],["之火花",{fire:[4,12]},1],["之恢復",{lifeRegen:[1,4]},1],
+["之烈焰",{firePct:[12,22]},2],["之掠奪",{lifeSteal:[2,6]},2],["之抗衡",{res:[8,16]},2],
+["之法能",{spellPct:[10,20]},2],["之財富",{gf:[12,28]},2],["之機運",{mf:[10,22]},2],
+["之永生",{hpPct:[18,32],lifeRegen:[2,6]},3],["之毀滅",{atkPct:[20,36],lifeSteal:[3,7]},3],
+["之通達",{allSkills:[1,1]},3],["之師承",{classSkills:[1,2]},3],
+["之堅壁",{dr:[4,10],defPct:[10,18]},3],["之迅捷",{fhr:[8,16],frw:[6,14]},2]
+];
 var BASES=[["粗布兜帽","頭盔",1,[0,0],[1,4],0],["裂紋鐵盔","頭盔",8,[0,0],[6,16],2],["守誓冠冕","頭盔",20,[0,0],[20,42],3],["荒旅外衣","身體",1,[0,0],[2,8],0],["黑鋼胸鎧","身體",10,[0,0],[14,30],3],["深淵板甲","身體",24,[0,0],[32,68],4],["銅短刃","主手",1,[3,8],[0,0],0],["秘銀長兵","主手",10,[12,26],[0,0],3],["星隕巨刃","主手",24,[30,60],[0,0],5],["木紋圓盾","副手",1,[0,0],[2,8],0],["黑曜壁盾","副手",12,[0,0],[14,32],3],["銅戒指","戒指",1,[0,3],[0,0],0],["秘銀戒指","戒指",12,[3,10],[0,0],1],["星晶戒指","戒指",22,[10,24],[0,0],2],["行軍腰帶","腰帶",1,[0,0],[1,5],0],["深袋戰帶","腰帶",10,[0,0],[8,18],2],["旅者軟靴","鞋子",1,[0,0],[1,4],0],["疾行護脛","鞋子",12,[0,0],[8,18],2],["骨紋項鍊","項鍊",1,[2,6],[0,0],0],["太陽墜飾","項鍊",14,[10,26],[0,0],2],["白骨長劍","主手",5,[6,14],[0,0],2],["無印板甲","身體",15,[0,0],[18,40],4],["空殼戰盔","頭盔",15,[0,0],[12,28],3],["六孔秘銀","主手",30,[35,70],[0,0],6]];
 var UNIQUES=[{name:"無燼之冠",slot:"頭盔",il:20,req:18,mods:{hp:45,defPct:18,res:12,spellPct:14,fireRes:15},bs:{def:30},desc:"深淵唯一冠冕"},{name:"裂谷之牙",slot:"主手",il:18,req:16,mods:{atkPct:25,lifeSteal:5,fire:14},bs:{atk:35},desc:"裂谷吞噬者獠牙"},{name:"萬魂骨戒",slot:"戒指",il:15,req:12,mods:{summonAtk:20,summonHp:18,hp:30,summonCap:1},bs:{spell:10},desc:"召喚師之戒"},{name:"星隕裁決",slot:"主手",il:26,req:24,mods:{atkPct:38,holy:22,lifeSteal:5},bs:{atk:50},desc:"星隕巨刃"},{name:"深淵之眼",slot:"戒指",il:24,req:22,mods:{spellPct:32,mpPct:22,firePct:16,fireRes:20},bs:{spell:20},desc:"深淵獨眼"}];
-var SETS_INFO={"魂僕軍團":{pieces:["軍團骨盔","軍團骨甲","軍團骨杖"],bonus:["2件：召攻+14% 召血+11%","3件：召攻+28% 召血+22% 召限+2"]},"衰朽咒文":{pieces:["衰朽面紗","衰朽袍","衰朽戒"],bonus:["2件：法傷+11%","3件：法傷+22% 魔力+15%"]},"裂鋼戰意":{pieces:["裂鋼戰盔","裂鋼胸甲","裂鋼巨刃"],bonus:["2件：攻擊+12%","3件：攻擊+25% 生命+30"]},"炎紋之印":{pieces:["炎紋冠","炎紋袍","炎紋杖"],bonus:["2件：火焰+15%","3件：火焰+30% 法傷+15%"]}};
-
+var SETS_INFO={
+"無燼軍團套":{
+  pieces:["無燼軍團盔","無燼軍團甲","無燼軍團刃","無燼軍團盾","無燼軍團帶","無燼軍團靴","無燼軍團墜","無燼軍團戒甲","無燼軍團戒乙"],
+  slots:["頭盔","身體","主手","副手","腰帶","鞋子","項鍊","戒指","戒指"],
+  bonus3:["召喚物攻擊 +18%","召喚物生命 +15%","生命 +40"],
+  bonus6:["召喚上限 +2","全抗性 +20","攻擊加成 +12%"],
+  bonus9:["全抗性 +50","召喚物攻擊 +35%","召喚物生命 +30%","法術加成 +15%"]
+},
+"裂鋼戰意套":{
+  pieces:["裂鋼戰盔","裂鋼胸甲","裂鋼巨刃","裂鋼盾","裂鋼腰帶","裂鋼戰靴","裂鋼墜飾","裂鋼戰戒甲","裂鋼戰戒乙"],
+  slots:["頭盔","身體","主手","副手","腰帶","鞋子","項鍊","戒指","戒指"],
+  bonus3:["攻擊加成 +15%","生命 +50","防禦 +20"],
+  bonus6:["攻擊加成 +28%","生命偷取 +4%","全抗性 +18"],
+  bonus9:["全抗性 +50","攻擊加成 +40%","物理減傷 +8%","生命 +120"]
+},
+"炎紋法衣套":{
+  pieces:["炎紋冠","炎紋袍","炎紋杖","炎紋寶珠","炎紋束帶","炎紋履","炎紋墜","炎紋戒甲","炎紋戒乙"],
+  slots:["頭盔","身體","主手","副手","腰帶","鞋子","項鍊","戒指","戒指"],
+  bonus3:["火焰加成 +20%","法術加成 +12%","魔力 +40"],
+  bonus6:["火焰加成 +35%","法術加成 +22%","全抗性 +18"],
+  bonus9:["全抗性 +50","火焰加成 +50%","法術加成 +35%","擊殺回魔 +5"]
+},
+"星弓獵裝套":{
+  pieces:["星弓兜帽","星弓皮甲","星弓長弓","星弓箭袋","星弓腰帶","星弓軟靴","星弓墜","星弓戒甲","星弓戒乙"],
+  slots:["頭盔","身體","主手","副手","腰帶","鞋子","項鍊","戒指","戒指"],
+  bonus3:["攻擊加成 +14%","敏捷 +12","魔法尋找 +15"],
+  bonus6:["攻擊加成 +26%","生命偷取 +3%","全抗性 +16"],
+  bonus9:["全抗性 +50","攻擊加成 +38%","魔法尋找 +35","移動速度 +12"]
+},
+"暮影刺客套":{
+  pieces:["暮影面罩","暮影勁裝","暮影雙刃","暮影短匕","暮影腰帶","暮影靴","暮影墜","暮影戒甲","暮影戒乙"],
+  slots:["頭盔","身體","主手","副手","腰帶","鞋子","項鍊","戒指","戒指"],
+  bonus3:["攻擊加成 +16%","生命偷取 +3%","受擊恢復 +10"],
+  bonus6:["攻擊加成 +30%","全抗性 +18","移動速度 +10"],
+  bonus9:["全抗性 +50","攻擊加成 +42%","生命偷取 +6%","物理減傷 +6%"]
+},
+"荒野先知套":{
+  pieces:["荒野頭飾","荒野袍","荒野法杖","荒野圖騰","荒野束腰","荒野履","荒野墜","荒野戒甲","荒野戒乙"],
+  slots:["頭盔","身體","主手","副手","腰帶","鞋子","項鍊","戒指","戒指"],
+  bonus3:["法術加成 +14%","生命 +45","全抗性 +10"],
+  bonus6:["法術加成 +26%","生命恢復 +4","全抗性 +20"],
+  bonus9:["全抗性 +50","法術加成 +38%","生命 +100","召喚物生命 +20%"]
+},
+"聖誓守衛套":{
+  pieces:["聖誓盔","聖誓板甲","聖誓戰錘","聖誓塔盾","聖誓腰帶","聖誓重靴","聖誓聖徽","聖誓戒甲","聖誓戒乙"],
+  slots:["頭盔","身體","主手","副手","腰帶","鞋子","項鍊","戒指","戒指"],
+  bonus3:["防禦加成 +18%","生命 +55","全抗性 +12"],
+  bonus6:["防禦加成 +30%","神聖傷害 +20","全抗性 +22"],
+  bonus9:["全抗性 +50","防禦加成 +40%","物理減傷 +10%","生命 +140"]
+}
+};
 /* 純中文符文 */
 var RUNES=[
-  {id:"燼核",n:"燼核",t:1,m:{atk:5}},{id:"塵晶",n:"塵晶",t:1,m:{atkPct:6}},
-  {id:"脈流",n:"脈流",t:1,m:{mp:14}},{id:"裂片",n:"裂片",t:1,m:{def:6}},
-  {id:"餘焰",n:"餘焰",t:2,m:{fire:10}},{id:"霜髓",n:"霜髓",t:2,m:{cold:10}},
-  {id:"電弧",n:"電弧",t:2,m:{light:10}},{id:"毒牙",n:"毒牙",t:2,m:{poison:10}},
-  {id:"沉鐵",n:"沉鐵",t:3,m:{defPct:8,hp:14}},{id:"疾風",n:"疾風",t:3,m:{dex:8}},
-  {id:"血露",n:"血露",t:3,m:{lifeSteal:3}},{id:"心核",n:"心核",t:3,m:{hp:20}},
-  {id:"虛隙",n:"虛隙",t:4,m:{spellPct:12}},{id:"潮汐",n:"潮汐",t:4,m:{mpPct:12}},
-  {id:"磐石",n:"磐石",t:4,m:{res:10}},{id:"獠牙",n:"獠牙",t:5,m:{atkPct:14}},
-  {id:"冠冕",n:"冠冕",t:5,m:{str:12}},{id:"薄霧",n:"薄霧",t:5,m:{dex:12}},
-  {id:"鍛焰",n:"鍛焰",t:6,m:{firePct:16,atkPct:8}},{id:"深淵",n:"深淵",t:6,m:{spellPct:16}},
-  {id:"誓約",n:"誓約",t:6,m:{holy:14}},{id:"崩壞",n:"崩壞",t:7,m:{atkPct:20,lifeSteal:3}},
-  {id:"蝕日",n:"蝕日",t:7,m:{spellPct:20,res:12}},{id:"錨定",n:"錨定",t:7,m:{hpPct:16}},
-  {id:"新星",n:"新星",t:8,m:{atkPct:22,spellPct:14}},{id:"幽靈",n:"幽靈",t:8,m:{summonAtk:16,summonHp:14}},
-  {id:"暴君",n:"暴君",t:8,m:{atkPct:24}},{id:"聖域",n:"聖域",t:9,m:{hpPct:22,res:16}},
-  {id:"災變",n:"災變",t:9,m:{firePct:24,spellPct:20}},{id:"永恆",n:"永恆",t:9,m:{hpPct:24,mpPct:16}},
-  {id:"湮滅",n:"湮滅",t:10,m:{atkPct:30,spellPct:24}},{id:"起源",n:"起源",t:10,m:{hpPct:26,summonCap:2}},
-  {id:"極點",n:"極點",t:10,m:{atkPct:32,spellPct:26,res:14}}
+{id:"R01",n:"燼核",num:1,t:1,m:{atk:4}},
+{id:"R02",n:"塵晶",num:2,t:1,m:{atkPct:5}},
+{id:"R03",n:"脈流",num:3,t:1,m:{mp:12}},
+{id:"R04",n:"裂片",num:4,t:1,m:{def:5}},
+{id:"R05",n:"餘焰",num:5,t:2,m:{fire:8}},
+{id:"R06",n:"霜髓",num:6,t:2,m:{cold:8}},
+{id:"R07",n:"電弧",num:7,t:2,m:{light:8}},
+{id:"R08",n:"毒牙",num:8,t:2,m:{poison:8}},
+{id:"R09",n:"沉鐵",num:9,t:3,m:{defPct:6,hp:12}},
+{id:"R10",n:"疾風",num:10,t:3,m:{dex:7}},
+{id:"R11",n:"血露",num:11,t:3,m:{lifeSteal:2}},
+{id:"R12",n:"心核",num:12,t:3,m:{hp:18}},
+{id:"R13",n:"虛隙",num:13,t:4,m:{spellPct:10}},
+{id:"R14",n:"潮汐",num:14,t:4,m:{mpPct:10}},
+{id:"R15",n:"磐石",num:15,t:4,m:{res:8}},
+{id:"R16",n:"獠牙",num:16,t:5,m:{atkPct:12}},
+{id:"R17",n:"冠冕",num:17,t:5,m:{str:10}},
+{id:"R18",n:"薄霧",num:18,t:5,m:{dex:10}},
+{id:"R19",n:"鍛焰",num:19,t:6,m:{firePct:14,atkPct:6}},
+{id:"R20",n:"深淵",num:20,t:6,m:{spellPct:14}},
+{id:"R21",n:"誓約",num:21,t:6,m:{holy:12}},
+{id:"R22",n:"崩壞",num:22,t:7,m:{atkPct:16,lifeSteal:2}},
+{id:"R23",n:"蝕日",num:23,t:7,m:{spellPct:16,res:10}},
+{id:"R24",n:"錨定",num:24,t:7,m:{hpPct:14}},
+{id:"R25",n:"新星",num:25,t:8,m:{atkPct:18,spellPct:12}},
+{id:"R26",n:"幽靈",num:26,t:8,m:{summonAtk:14,summonHp:12}},
+{id:"R27",n:"暴君",num:27,t:8,m:{atkPct:20}},
+{id:"R28",n:"聖域",num:28,t:9,m:{hpPct:18,res:14}},
+{id:"R29",n:"災變",num:29,t:9,m:{firePct:20,spellPct:16}},
+{id:"R30",n:"永恆",num:30,t:9,m:{hpPct:20,mpPct:14}},
+{id:"R31",n:"湮滅",num:31,t:10,m:{atkPct:26,spellPct:20}},
+{id:"R32",n:"起源",num:32,t:10,m:{hpPct:22,summonCap:2}},
+{id:"R33",n:"極點",num:33,t:10,m:{atkPct:28,spellPct:22,res:12}}
 ];
-/* 舊英文ID對照遷移 */
-var RUNE_MIG={Ash:"燼核",Dust:"塵晶",Vein:"脈流",Shard:"裂片",Ember:"餘焰",Frost:"霜髓",Spark:"電弧",Venom:"毒牙",Iron:"沉鐵",Gale:"疾風",Blood:"血露",Core:"心核",Void:"虛隙",Tide:"潮汐",Stone:"磐石",Fang:"獠牙",Crown:"冠冕",Mist:"薄霧",Forge:"鍛焰",Abyss:"深淵",Oath:"誓約",Ruin:"崩壞",Eclipse:"蝕日",Anchor:"錨定",Nova:"新星",Wraith:"幽靈",Tyrant:"暴君",Sanctum:"聖域",Cataclysm:"災變",Eternal:"永恆",Oblivion:"湮滅",Genesis:"起源",Apex:"極點"};
-
+var RUNE_BY_ID={};RUNES.forEach(function(r){RUNE_BY_ID[r.id]=r;RUNE_BY_ID[r.n]=r});
+var RUNE_MIG={Ash:"燼核",Dust:"塵晶",Vein:"脈流",Shard:"裂片",Ember:"餘焰",Frost:"霜髓",Spark:"電弧",Venom:"毒牙",Iron:"沉鐵",Gale:"疾風",Blood:"血露",Core:"心核",Void:"虛隙",Tide:"潮汐",Stone:"磐石",Fang:"獠牙",Crown:"冠冕",Mist:"薄霧",Forge:"鍛焰",Abyss:"深淵",Oath:"誓約",Ruin:"崩壞",Eclipse:"蝕日",Anchor:"錨定",Nova:"新星",Wraith:"幽靈",Tyrant:"暴君",Sanctum:"聖域",Cataclysm:"災變",Eternal:"永恆",Oblivion:"湮滅",Genesis:"起源",Apex:"極點",
+R01:"燼核",R02:"塵晶",R03:"脈流",R04:"裂片",R05:"餘焰",R06:"霜髓",R07:"電弧",R08:"毒牙",R09:"沉鐵",R10:"疾風",R11:"血露",R12:"心核",R13:"虛隙",R14:"潮汐",R15:"磐石",R16:"獠牙",R17:"冠冕",R18:"薄霧",R19:"鍛焰",R20:"深淵",R21:"誓約",R22:"崩壞",R23:"蝕日",R24:"錨定",R25:"新星",R26:"幽靈",R27:"暴君",R28:"聖域",R29:"災變",R30:"永恆",R31:"湮滅",R32:"起源",R33:"極點"};
 var RUNEWORDS=[
-  /* 通用7種 */
-  {name:"初芒",r:["燼核","塵晶"],s:2,m:{atkPct:14,def:8},d:"通用近戰"},
-  {name:"流火",r:["餘焰","脈流"],s:2,m:{fire:16,mp:20},d:"通用火焰"},
-  {name:"寒脈",r:["霜髓","裂片"],s:2,m:{cold:14,def:10},d:"通用冰霜"},
-  {name:"雷芽",r:["電弧","塵晶"],s:2,m:{light:14,atkPct:8},d:"通用閃電"},
-  {name:"鐵壁",r:["沉鐵","心核","磐石"],s:3,m:{defPct:20,hp:35,res:10},d:"通用防禦"},
-  {name:"血誓",r:["血露","獠牙","心核"],s:3,m:{atkPct:18,lifeSteal:5,hp:22},d:"通用吸血"},
-  {name:"無燼王座",r:["聖域","永恆","極點"],s:3,m:{hpPct:28,atkPct:20,spellPct:20,res:18},d:"通用終局"},
-  /* 召喚 */
-  {name:"軍團號角",r:["幽靈","心核","起源"],s:3,m:{summonAtk:24,summonHp:20,summonCap:2},d:"召喚專屬"},
-  {name:"起源契約",r:["起源","幽靈","誓約","永恆"],s:4,m:{summonAtk:32,summonHp:28,summonCap:3,hpPct:16},d:"召喚終極"},
-  /* 法師 */
-  {name:"虛空低語",r:["虛隙","潮汐","深淵"],s:3,m:{spellPct:24,mpPct:18,res:8},d:"法師"},
-  {name:"災變星隕",r:["災變","新星","湮滅"],s:3,m:{firePct:28,spellPct:26,atkPct:12},d:"法師元素"},
-  /* 戰士 */
-  {name:"破陣之矛",r:["獠牙","鍛焰","崩壞"],s:3,m:{atkPct:26,firePct:14,lifeSteal:4},d:"戰士"},
-  {name:"萬軍鐵蹄",r:["沉鐵","冠冕","暴君"],s:3,m:{atkPct:22,defPct:14,hp:40},d:"戰士防攻"},
-  /* 遊俠 */
-  {name:"穿雲長矢",r:["疾風","薄霧","獠牙"],s:3,m:{atkPct:24,dex:16,lifeSteal:3},d:"遊俠"},
-  {name:"猎星之眼",r:["薄霧","新星","極點"],s:3,m:{atkPct:28,dex:12,spellPct:10},d:"遊俠終局"},
-  /* 影 */
-  {name:"永夜帷幕",r:["蝕日","薄霧","虛隙"],s:3,m:{spellPct:22,dex:14,res:12},d:"影"},
-  {name:"千影殺陣",r:["崩壞","薄霧","湮滅"],s:3,m:{atkPct:30,lifeSteal:5,dex:10},d:"影終局"},
-  /* 荒野 */
-  {name:"風暴之冠",r:["電弧","潮汐","深淵"],s:3,m:{light:20,spellPct:18,mpPct:12},d:"荒野"},
-  {name:"古木之心",r:["錨定","磐石","聖域"],s:3,m:{hpPct:24,defPct:16,res:14},d:"荒野防"},
-  /* 聖誓 */
-  {name:"聖裁之錘",r:["誓約","冠冕","鍛焰"],s:3,m:{atkPct:20,holy:18,hp:25},d:"聖誓"},
-  {name:"永恆壁壘",r:["聖域","錨定","磐石","永恆"],s:4,m:{defPct:28,hpPct:22,res:20},d:"聖誓防"}
+/* 通用 */
+{name:"初芒",r:["燼核","塵晶"],s:2,m:{atkPct:12,def:6},d:"通用"},
+{name:"流火",r:["餘焰","脈流"],s:2,m:{fire:14,mp:16},d:"通用火焰"},
+{name:"寒脈",r:["霜髓","裂片"],s:2,m:{cold:12,def:8},d:"通用冰霜"},
+{name:"雷芽",r:["電弧","塵晶"],s:2,m:{light:14,atkPct:8},d:"通用閃電"},
+{name:"鐵壁",r:["沉鐵","心核","磐石"],s:3,m:{defPct:18,hp:30,res:8},d:"通用防禦"},
+{name:"血誓",r:["血露","獠牙","心核"],s:3,m:{atkPct:16,lifeSteal:4,hp:18},d:"通用吸血"},
+{name:"無燼王座",r:["聖域","永恆","極點"],s:3,m:{hpPct:24,atkPct:16,spellPct:16,res:14},d:"通用終局"},
+/* 狂戰士 */
+{name:"破陣之矛",r:["獠牙","鍛焰","崩壞"],s:3,m:{atkPct:22,firePct:12,lifeSteal:3},d:"狂戰士·武器"},
+{name:"血怒戰旗",r:["血露","暴君","崩壞"],s:3,m:{atkPct:24,lifeSteal:5,hpPct:8},d:"狂戰士·狂怒"},
+{name:"萬軍鐵蹄",r:["沉鐵","冠冕","暴君","錨定","血露"],s:5,m:{atkPct:26,defPct:16,hp:60,lifeSteal:4},d:"狂戰士·戰吼"},
+/* 遊俠 */
+{name:"穿雲長矢",r:["疾風","薄霧","獠牙"],s:3,m:{atkPct:22,dex:14,lifeSteal:3},d:"遊俠·弓術"},
+{name:"獵神之眼",r:["薄霧","新星","極點"],s:3,m:{atkPct:26,dex:12,mf:12},d:"遊俠·獵手"},
+{name:"原野風痕",r:["疾風","潮汐","磐石","心核"],s:4,m:{atkPct:18,hpPct:12,res:10,frw:10},d:"遊俠·原野"},
+/* 術士 */
+{name:"虛空低語",r:["虛隙","潮汐","深淵"],s:3,m:{spellPct:20,mpPct:14,res:6},d:"術士·通用法"},
+{name:"炎獄卷軸",r:["餘焰","鍛焰","災變"],s:3,m:{firePct:28,spellPct:16},d:"術士·炎紋"},
+{name:"霜界編年",r:["霜髓","錨定","蝕日"],s:3,m:{coldPct:26,defPct:12,spellPct:14},d:"術士·霜界"},
+{name:"雷序法典",r:["電弧","新星","深淵"],s:3,m:{lightPct:26,spellPct:18,mpPct:10},d:"術士·雷序"},
+{name:"災變星隕",r:["災變","新星","湮滅","深淵"],s:4,m:{firePct:22,spellPct:24,atkPct:8,res:8},d:"術士·終局"},
+/* 召喚 */
+{name:"軍團號角",r:["幽靈","心核","起源"],s:3,m:{summonAtk:20,summonHp:16,summonCap:1},d:"召喚·軍團"},
+{name:"衰朽之契",r:["毒牙","虛隙","蝕日"],s:3,m:{spellPct:18,poison:12,res:8},d:"召喚·衰朽"},
+{name:"骨魂聖骸",r:["裂片","磐石","錨定"],s:3,m:{defPct:16,spellPct:14,hpPct:10},d:"召喚·骨魂"},
+{name:"起源契約",r:["起源","幽靈","誓約","永恆"],s:4,m:{summonAtk:28,summonHp:24,summonCap:2,hpPct:12},d:"召喚·進階"},
+/* 影 */
+{name:"永夜帷幕",r:["蝕日","薄霧","虛隙"],s:3,m:{spellPct:18,dex:12,res:10},d:"影·身法"},
+{name:"千影殺陣",r:["崩壞","薄霧","湮滅","疾風"],s:4,m:{atkPct:28,lifeSteal:5,dex:10,frw:8},d:"影·刃舞"},
+{name:"機括殺意",r:["毒牙","疾風","新星"],s:3,m:{atkPct:20,poison:10,mf:10},d:"影·陷阱"},
+/* 荒野 */
+{name:"風暴之冠",r:["電弧","潮汐","深淵"],s:3,m:{light:18,spellPct:16,mpPct:10},d:"荒野·風暴"},
+{name:"古木之心",r:["錨定","磐石","聖域"],s:3,m:{hpPct:20,defPct:14,res:12},d:"荒野·自然"},
+{name:"獸魂圖騰",r:["血露","冠冕","心核"],s:3,m:{atkPct:18,hpPct:12,summonHp:10},d:"荒野·獸形"},
+/* 聖誓 */
+{name:"聖裁之錘",r:["誓約","冠冕","鍛焰"],s:3,m:{atkPct:18,holy:16,hp:22},d:"聖誓·武技"},
+{name:"永恆壁壘",r:["聖域","錨定","磐石","永恆"],s:4,m:{defPct:26,hpPct:20,res:16,dr:5},d:"聖誓·守護"},
+{name:"懲戒烈陽",r:["誓約","餘焰","新星"],s:3,m:{atkPct:16,spellPct:14,holy:14},d:"聖誓·懲戒"},
+/* 六符均衡（各向） */
+{name:"無燼終章",r:["極點","湮滅","起源","永恆","聖域","災變"],s:6,m:{atkPct:28,spellPct:26,hpPct:20,res:18,allSkills:1},d:"六符·終章"},
+{name:"創世契約",r:["起源","極點","幽靈","永恆","心核","磐石"],s:6,m:{summonAtk:32,summonHp:28,summonCap:2,hpPct:16,res:14},d:"六符·軍團"},
+{name:"裂天戰歌",r:["暴君","崩壞","鍛焰","冠冕","血露","極點"],s:6,m:{atkPct:34,lifeSteal:6,hpPct:14,firePct:12,res:12},d:"六符·戰士"},
+{name:"星穹法典",r:["災變","蝕日","深淵","新星","虛隙","極點"],s:6,m:{spellPct:34,firePct:16,coldPct:12,lightPct:12,mpPct:14,res:14},d:"六符·法師"},
+{name:"影葬夜典",r:["湮滅","薄霧","崩壞","疾風","蝕日","極點"],s:6,m:{atkPct:32,dex:16,lifeSteal:6,frw:12,res:12},d:"六符·影"},
+{name:"聖域神諭",r:["聖域","誓約","永恆","錨定","磐石","極點"],s:6,m:{defPct:28,hpPct:24,res:22,holy:18,dr:8},d:"六符·聖誓"}
 ];
 
 var POTIONS=[{id:"hpS",n:"微型生命藥劑",type:"hp",v:45,p:12},{id:"hpM",n:"中型生命藥劑",type:"hp",v:100,p:40},{id:"hpL",n:"強效生命藥劑",type:"hp",v:180,p:85},{id:"mpS",n:"微型魔力藥劑",type:"mp",v:40,p:12},{id:"mpM",n:"中型魔力藥劑",type:"mp",v:90,p:40},{id:"mpL",n:"強效魔力藥劑",type:"mp",v:160,p:85},{id:"town",n:"歸營卷軸",type:"town",v:1,p:35},{id:"idS",n:"鑑定卷軸",type:"id",v:1,p:22}];
@@ -561,9 +748,9 @@ function fresh(cid,name){
     str:a[0],dex:a[1],vit:a[2],ene:a[3],
     skills:{},specTree:null,items:[],eq:{},runes:[],minions:[],
     pot:{hpS:5,mpS:5,hpM:1,mpM:1,hpL:0,mpL:0,hpX:0,mpX:0,town:2,idS:3},
-    buffs:{},shield:0,logs:[],auto:defAuto(),lastSave:Date.now()};
+    buffs:{},shield:0,logs:[],auto:defAuto(),lastSave:Date.now(),lastSettlementId:null};
 }
-function saveAll(){try{localStorage.setItem(STORE,JSON.stringify({slots:slots,active:active}));return true}catch(e){return false}}
+function saveAll(){try{var snap={slots:slots,active:active,schemaVersion:SCHEMA_VERSION};localStorage.setItem(STORE,JSON.stringify(snap));pushBackup(snap);return true}catch(e){return false}}
 function save(){if(active>=0&&S){S.lastSave=Date.now();slots[active]=JSON.parse(JSON.stringify(S))}return saveAll()}
 function migrateRunes(arr){
   if(!arr)return[];
@@ -603,39 +790,71 @@ function itemName(it){
 }
 function getSkill(key){if(!S)return null;var list=buildSkills(S.cid);for(var i=0;i<list.length;i++)if(list[i].key===key)return list[i];return null}
 function mods(){
-  var m={atk:0,spell:0,def:0,hp:0,mp:0,str:0,dex:0,fire:0,cold:0,light:0,res:0,atkPct:0,spellPct:0,defPct:0,hpPct:0,mpPct:0,firePct:0,coldPct:0,lightPct:0,lifeRegen:0,lifeSteal:0,summonAtk:0,summonHp:0,summonCap:0,fireRes:0,coldRes:0,lightRes:0,poisonRes:0,curseRes:0};
+  var m={atk:0,spell:0,def:0,hp:0,mp:0,str:0,dex:0,fire:0,cold:0,light:0,poison:0,holy:0,res:0,atkPct:0,spellPct:0,defPct:0,hpPct:0,mpPct:0,firePct:0,coldPct:0,lightPct:0,lifeRegen:0,lifeSteal:0,summonAtk:0,summonHp:0,summonCap:0,fireRes:0,coldRes:0,lightRes:0,poisonRes:0,curseRes:0,allSkills:0,classSkills:0,fhr:0,frw:0,mf:0,gf:0,dr:0,cdr:0,manaOnKill:0,lifeOnKill:0};
   if(!S)return m;
+  function addMods(src){if(!src)return;Object.keys(src).forEach(function(k){m[k]=(m[k]||0)+(src[k]||0)})}
+  var setCount={};
   Object.keys(S.eq).forEach(function(slot){
     var id=S.eq[slot],it=null;
     for(var i=0;i<S.items.length;i++)if(S.items[i].id===id){it=S.items[i];break}
     if(!it||!it.id_ed)return;
-    if(it.bs)Object.keys(it.bs).forEach(function(k){m[k]=(m[k]||0)+it.bs[k]});
-    if(it.mods)Object.keys(it.mods).forEach(function(k){m[k]=(m[k]||0)+it.mods[k]});
-    if(it.rwMods)Object.keys(it.rwMods).forEach(function(k){m[k]=(m[k]||0)+it.rwMods[k]});
+    addMods(it.bs);addMods(it.mods);addMods(it.rwMods);
+    if(it.set)setCount[it.set]=(setCount[it.set]||0)+1;
     if(it.sock&&it.filled&&!it.rw){
       it.filled.forEach(function(rid){
-        for(var j=0;j<RUNES.length;j++)if(RUNES[j].id===rid)Object.keys(RUNES[j].m).forEach(function(k){m[k]=(m[k]||0)+RUNES[j].m[k]});
+        var rn=RUNE_BY_ID[rid]||RUNE_BY_ID[RUNE_MIG[rid]]||null;
+        if(rn)addMods(rn.m);
       });
     }
   });
+  /* 套裝 3/6/9 */
+  Object.keys(setCount).forEach(function(sn){
+    var info=SETS_INFO[sn]; if(!info)return;
+    var c=setCount[sn];
+    if(c>=3){m.hp+=20;m.atkPct+=6;m.res+=5}
+    if(c>=6){m.atkPct+=10;m.spellPct+=8;m.res+=12;m.hpPct+=6}
+    if(c>=9){m.res+=50;m.atkPct+=12;m.spellPct+=10;m.hpPct+=10;m.dr=(m.dr||0)+4} /* 全套必備+50全抗 */
+  });
   Object.keys(S.skills).forEach(function(k){
     var n=S.skills[k];if(!n)return;var sk=getSkill(k);if(!sk||sk.t!=="passive")return;
-    if(sk.atkPct)m.atkPct+=sk.atkPct*n;if(sk.spellPct)m.spellPct+=sk.spellPct*n;
-    if(sk.defPct)m.defPct+=sk.defPct*n;if(sk.hpPct)m.hpPct+=sk.hpPct*n;
-    if(sk.ls)m.lifeSteal+=sk.ls*n;if(sk.res)m.res+=sk.res*n;
-    if(sk.sumAtk)m.summonAtk+=sk.sumAtk*n;if(sk.sumHp)m.summonHp+=sk.sumHp*n;if(sk.sumCap)m.summonCap+=sk.sumCap*n;
+    var lvMul=n; /* 每級疊加 */
+    if(sk.atkPct)m.atkPct+=sk.atkPct*lvMul;
+    if(sk.spellPct)m.spellPct+=sk.spellPct*lvMul;
+    if(sk.defPct)m.defPct+=sk.defPct*lvMul;
+    if(sk.hpPct)m.hpPct+=sk.hpPct*lvMul;
+    if(sk.mpPct)m.mpPct+=sk.mpPct*lvMul;
+    if(sk.ls)m.lifeSteal+=sk.ls*lvMul;
+    if(sk.res)m.res+=sk.res*lvMul;
+    if(sk.firePct)m.firePct+=sk.firePct*lvMul;
+    if(sk.coldPct)m.coldPct+=sk.coldPct*lvMul;
+    if(sk.lightPct)m.lightPct+=sk.lightPct*lvMul;
+    if(sk.sumAtk)m.summonAtk+=sk.sumAtk*lvMul;
+    if(sk.sumHp)m.summonHp+=sk.sumHp*lvMul;
+    if(sk.sumCap)m.summonCap+=sk.sumCap*lvMul;
+    if(sk.regen)m.lifeRegen+=sk.regen*lvMul;
   });
   return m;
 }
 function tot(){
   var m=mods();
+  var skillBonus=1+0.04*((m.allSkills||0)+(m.classSkills||0));
   var sb=Math.floor((S.str+m.str)*0.4),db=Math.floor((S.dex+m.dex)*0.3),vb=Math.floor(S.vit*0.8),eb=Math.floor(S.ene*0.6);
   var atk=S.atk+Math.floor(S.lv*1.2)+m.atk+sb+Math.floor((S.atk+m.atk+sb)*m.atkPct/100);
+  atk=Math.floor(atk*skillBonus);
+  var sp=S.spell+Math.floor(S.lv*0.9)+m.spell+eb+Math.floor((S.spell+m.spell+eb)*m.spellPct/100);
+  sp=Math.floor(sp*skillBonus);
   var def=S.def+Math.floor(S.lv*0.6)+m.def+Math.floor(db*0.5)+Math.floor((S.def+m.def)*m.defPct/100);
   if(S.buffs&&S.buffs.atk)atk=Math.floor(atk*(1+S.buffs.atk));
   if(S.buffs&&S.buffs.def)def=Math.floor(def*(1+S.buffs.def));
-  return{m:m,a:atk,sp:S.spell+Math.floor(S.lv*0.9)+m.spell+eb+Math.floor((S.spell+m.spell+eb)*m.spellPct/100),d:def,
-    hp:S.mhp+m.hp+vb+Math.floor(S.mhp*m.hpPct/100),mp:S.mmp+m.mp+eb+Math.floor(S.mmp*m.mpPct/100)};
+  return{m:m,a:atk,sp:sp,d:def,
+    hp:S.mhp+m.hp+vb+Math.floor(S.mhp*m.hpPct/100),
+    mp:S.mmp+m.mp+eb+Math.floor(S.mmp*m.mpPct/100),
+    fireRes:Math.min(75,(m.res||0)+(m.fireRes||0)),
+    coldRes:Math.min(75,(m.res||0)+(m.coldRes||0)),
+    lightRes:Math.min(75,(m.res||0)+(m.lightRes||0)),
+    poisonRes:Math.min(75,(m.res||0)+(m.poisonRes||0)),
+    curseRes:Math.min(75,(m.res||0)+(m.curseRes||0)),
+    dr:Math.min(50,m.dr||0)};
 }
 function needXp(){return Math.floor(40*Math.pow(S.lv,1.42))}
 function levelUp(){
@@ -732,14 +951,13 @@ function genPack(){
 }
 
 function playerRes(ele){
-  var m=mods();
-  var base=m.res||0;
-  if(ele==="fire")return Math.min(75,base+(m.fireRes||0));
-  if(ele==="cold")return Math.min(75,base+(m.coldRes||0));
-  if(ele==="light")return Math.min(75,base+(m.lightRes||0));
-  if(ele==="poison")return Math.min(75,base+(m.poisonRes||0));
-  if(ele==="curse")return Math.min(75,base+(m.curseRes||0));
-  return Math.min(75,base);
+  var t=tot();
+  if(ele==="fire")return t.fireRes;
+  if(ele==="cold")return t.coldRes;
+  if(ele==="light")return t.lightRes;
+  if(ele==="poison")return t.poisonRes;
+  if(ele==="curse")return t.curseRes;
+  return Math.min(75,(t.m.res||0));
 }
 function eleName(e){return{fire:"火焰",cold:"冰冷",light:"閃電",poison:"毒素",curse:"詛咒"}[e]||""}
 
@@ -764,7 +982,7 @@ function fight(skillKey){
   if(!alive.length){pack=genPack();alive=pack}
 
   var target=alive[0];
-  var dmg=0,mul=(sk&&sk.mul)?sk.mul:1,hits=(sk&&sk.hits)?sk.hits:1;
+  var dmg=0,mul=(sk&&sk.mul)?sk.mul:1,hits=(sk&&sk.hits)?sk.hits:1;var skLv=sk?(S.skills[skillKey]||1):1;if(sk&&sk.mul)mul=mul*(1+(skLv-1)*0.08);
   var baseAtk=(sk&&(sk.t==="spell"||sk.t==="dot"||sk.t==="control"))?t.sp:t.a;
   var eDef=target.def*(1-(target.defDown||0));
   dmg=Math.max(1,Math.floor(baseAtk*mul-eDef*0.4+rnd(0,3)));
@@ -797,7 +1015,15 @@ function fight(skillKey){
     log("擊敗"+(e.rank==="unique"?"獨特":e.rank==="boss"?"首領":e.rank==="champ"?"精英":"")+e.name+" +"+e.xp+"經驗 +"+e.gold+"金","sys");
     var ch=e.rank==="unique"?0.7:e.rank==="boss"?0.5:e.rank==="champ"?0.28:0.1;
     if(Math.random()<Math.min(0.75,ch*(e.loot||1)))handleLoot(makeItem(e.rank==="unique"?5:e.rank==="boss"?4:e.rank==="champ"?2:0,e.rank==="unique"&&Math.random()<0.12));
-    if((e.rank==="boss"||e.rank==="unique")&&Math.random()<0.2){var maxT=Math.min(10,Math.floor(S.lv/5)+1);var pool=RUNES.filter(function(r){return r.t<=maxT});var rn=pick(pool);S.runes.push(rn.id);log("符文："+rn.n,"drop")}
+    if((e.rank==="boss"||e.rank==="unique")&&Math.random()<0.07){
+          var roll=Math.random(), pool;
+          if(roll<0.62)pool=RUNES.filter(function(r){return r.num<=10});
+          else if(roll<0.88)pool=RUNES.filter(function(r){return r.num>=11&&r.num<=20});
+          else if(roll<0.97)pool=RUNES.filter(function(r){return r.num>=21&&r.num<=28});
+          else if(roll<0.995)pool=RUNES.filter(function(r){return r.num>=29&&r.num<=31});
+          else pool=RUNES.filter(function(r){return r.num>=32});
+          if(pool.length){var rn=pick(pool);S.runes.push(rn.n);log("符文："+rn.n+" #"+rn.num,"drop")}
+        }
     if((e.rank==="boss"||e.rank==="unique"||e.rank==="champ")&&Math.random()<0.12){var dp=pick(DROP_POT);S.pot[dp.id]=(S.pot[dp.id]||0)+1;log("掉落 "+dp.n,"drop")}
   });
   if(pack.every(function(e){return e.hp<=0})){
@@ -831,8 +1057,9 @@ function fight(skillKey){
       }else{
         if(S.shield>0){var ab=Math.min(S.shield,totalD);S.shield-=ab;totalD-=ab;if(S.shield<=0)log("護盾破碎","warn")}
         if(totalD>0){
+          var tdr=tot().dr||0;if(tdr)totalD=Math.max(1,Math.floor(totalD*(1-tdr/100)));
           S.hp-=totalD;
-          log(en.name+(eleLabel?"（"+eleLabel+"）":"")+" → 你 "+totalD+(eleLabel?" [抗性已計]":""),"ele");
+          log(en.name+(eleLabel?"（"+eleLabel+"）":"")+" → 你 "+totalD+(eleLabel?" [抗性已計]":"")+(tdr?" [減傷"+tdr+"%]":""),"ele");
         }
       }
     });
@@ -853,25 +1080,45 @@ function addMinion(ex,lv){
   var t=tot(),m=mods();
   for(var i=0;i<c;i++){
     if(S.minions.length>=maxMinions()){var idx=S.minions.findIndex(function(x){return !x.tank});S.minions.splice(idx<0?0:idx,1)}
-    var atk=Math.floor(t.a*(ex.am||0.5)*(1+(m.summonAtk||0)/100)*(1+lv*0.1));
-    var hp=Math.floor(t.hp*(ex.hm||0.4)*(1+(m.summonHp||0)/100)*(1+lv*0.08));
+    var atk=Math.floor(t.a*(ex.am||0.5)*(1+(m.summonAtk||0)/100)*(1+lv*0.12));
+    var hp=Math.floor(t.hp*(ex.hm||0.4)*(1+(m.summonHp||0)/100)*(1+lv*0.12));
+    /* 技能等級顯著強化 */
+    atk=Math.floor(atk*(1+(lv-1)*0.09)); hp=Math.floor(hp*(1+(lv-1)*0.09));
     if(S.cid==="soul"){atk=Math.floor(atk*1.12);hp=Math.floor(hp*1.12)}
     S.minions.push({name:ex.n,hp:hp,max:hp,atk:atk,tank:!!ex.tank});
   }
   log("召喚 "+c+" 隻"+ex.n+"（"+S.minions.length+"/"+maxMinions()+"）","sum");
 }
 
-function makeItem(bonus,forceU){
-  bonus=bonus||0;
-  if(forceU||(bonus>=4&&Math.random()<0.04)||Math.random()<0.002){
+function makeItem(bonus,forceU,opts){
+  bonus=bonus||0; opts=opts||{};
+  /* 獨特 */
+  if(forceU||(bonus>=4&&Math.random()<0.035)||Math.random()<0.0015){
     var pool=UNIQUES.filter(function(u){return u.il<=S.lv+12});
-    if(pool.length){var u=pick(pool);return{id:uid(),name:u.name,slot:u.slot,il:u.il,req:u.req,rar:"獨特",mods:Object.assign({},u.mods),bs:Object.assign({},u.bs),id_ed:Math.random()<0.12,sock:0,filled:[],unique:1,desc:u.desc}}
+    if(pool.length){
+      var u=pick(pool);
+      var um=Object.assign({},u.mods);
+      /* 職業全技能類詞綴 */
+      if(Math.random()<0.25)um.allSkills=(um.allSkills||0)+1;
+      if(Math.random()<0.2)um.classSkills=(um.classSkills||0)+1;
+      if(Math.random()<0.35)um.res=(um.res||0)+rnd(8,18);
+      return{id:uid(),name:u.name,slot:u.slot,il:u.il,req:u.req,rar:"獨特",mods:um,bs:Object.assign({},u.bs),id_ed:Math.random()<0.1,sock:0,filled:[],unique:1,desc:u.desc};
+    }
   }
-  if(bonus>=2&&Math.random()<0.012){
-    var sns=Object.keys(SETS_INFO),sn=pick(sns),pn=pick(SETS_INFO[sn].pieces);
-    var sl=/盔|冠|帽|面/.test(pn)?"頭盔":/甲|袍|衣/.test(pn)?"身體":/刃|杖|錘|弓/.test(pn)?"主手":/戒/.test(pn)?"戒指":/項/.test(pn)?"項鍊":/帶/.test(pn)?"腰帶":/靴/.test(pn)?"鞋子":"副手";
-    var il=Math.min(S.lv+4,50);
-    return{id:uid(),name:pn,slot:sl,il:il,req:Math.max(1,il-4),rar:"套裝",mods:{atkPct:rnd(5,12),hp:rnd(10,24)},bs:{atk:rnd(4,14),def:rnd(4,18)},id_ed:false,set:sn,sock:rnd(0,1),filled:[]};
+  /* 套裝件：9件套，主手極稀有 */
+  if(bonus>=2&&Math.random()<0.008){
+    var sns=Object.keys(SETS_INFO),sn=pick(sns),info=SETS_INFO[sn];
+    var pi=rnd(0,info.pieces.length-1);
+    /* 主手索引2 極稀 */
+    if(pi===2&&Math.random()>0.08)pi=pick([0,1,3,4,5,6,7,8]);
+    var pn=info.pieces[pi],sl=info.slots[pi]||"身體";
+    if(sl==="戒指")sl=Math.random()<0.5?"戒指":"戒指";
+    var il=Math.min(S.lv+6,55);
+    var sm={};
+    if(Math.random()<0.15){ /* 有詞綴的套裝更稀 */
+      sm.atkPct=rnd(4,12);sm.hp=rnd(8,20);if(Math.random()<0.3)sm.res=rnd(4,10);
+    }
+    return{id:uid(),name:pn,slot:sl==="戒指"?(Math.random()<0.5?"戒指":"戒指"):sl,il:il,req:Math.max(1,il-4),rar:"套裝",mods:sm,bs:{atk:rnd(3,12),def:rnd(4,16)},id_ed:false,set:sn,sock:0,filled:[]};
   }
   var elig=BASES.filter(function(b){return b[2]<=S.lv+S.zone*2+5});
   var b=pick(elig.length?elig:BASES);
@@ -879,24 +1126,48 @@ function makeItem(bonus,forceU){
   var req=Math.max(1,Math.min(il-rnd(1,4),S.lv+5));
   var tier=il>=22?3:il>=10?2:1;
   var r=Math.random(),rar;
-  if(bonus>=3)rar=r<0.55?"稀有":r<0.88?"史詩":r<0.97?"傳奇":"獨特";
-  else if(bonus>=1)rar=r<0.58?"魔法":r<0.9?"稀有":r<0.98?"史詩":"傳奇";
-  else rar=r<0.55?"普通":r<0.88?"魔法":r<0.97?"稀有":r<0.995?"史詩":"傳奇";
+  if(opts.forceRar)rar=opts.forceRar;
+  else if(bonus>=3)rar=r<0.5?"稀有":r<0.85?"史詩":r<0.96?"傳奇":"獨特";
+  else if(bonus>=1)rar=r<0.55?"魔法":r<0.88?"稀有":r<0.97?"史詩":"傳奇";
+  else rar=r<0.52?"普通":r<0.86?"魔法":r<0.96?"稀有":r<0.994?"史詩":"傳奇";
+
   var cnt=rar==="普通"?0:rar==="魔法"?1:rar==="稀有"?rnd(1,2):rar==="史詩"?rnd(2,3):rnd(2,4);
-  var modsObj={},affNames=[];
-  function addAff(arr){if(!arr.length)return;var a=pick(arr);affNames.push(a[0]);Object.keys(a[1]).forEach(function(k){var rg=a[1][k];modsObj[k]=(modsObj[k]||0)+rnd(rg[0],rg[1])})}
+  var modsObj={},affPre=[],affSuf=[];
+  function addAff(arr,into){if(!arr.length)return;var a=pick(arr);into.push(a[0]);Object.keys(a[1]).forEach(function(k){var rg=a[1][k];modsObj[k]=(modsObj[k]||0)+rnd(rg[0],rg[1])})}
   var pp=PRE.filter(function(x){return x[2]<=tier}),ss=SUF.filter(function(x){return x[2]<=tier});
-  for(var i=0;i<Math.ceil(cnt/2);i++)addAff(pp);for(var j=0;j<Math.floor(cnt/2);j++)addAff(ss);
+  for(var i=0;i<Math.ceil(cnt/2);i++)addAff(pp,affPre);
+  for(var j=0;j<Math.floor(cnt/2);j++)addAff(ss,affSuf);
+  /* 稀有以上有機會全抗、全技能 */
+  if(rar==="史詩"||rar==="傳奇"){
+    if(Math.random()<0.2)modsObj.res=(modsObj.res||0)+rnd(6,14);
+    if(Math.random()<0.08)modsObj.allSkills=(modsObj.allSkills||0)+1;
+    if(Math.random()<0.1)modsObj.classSkills=(modsObj.classSkills||0)+1;
+  }
   var bs={atk:b[3][0]?rnd(b[3][0],b[3][1]):0,spell:0,def:b[4][0]?rnd(b[4][0],b[4][1]):0};
   if(b[1]==="項鍊"||b[1]==="戒指")bs.spell=b[3][0]?rnd(b[3][0],b[3][1]):0;
-  var mul={"普通":1,"魔法":1.1,"稀有":1.25,"史詩":1.45,"傳奇":1.7}[rar]||1;
+  var mul={"普通":1,"魔法":1.12,"稀有":1.28,"史詩":1.5,"傳奇":1.75}[rar]||1;
   Object.keys(bs).forEach(function(k){bs[k]=Math.floor(bs[k]*mul)});
+
+  /* 洞：白裝可有詞綴也可有洞；6洞極稀 */
   var sock=0;
-  if(rar==="普通"&&b[5]>0&&Math.random()<0.25)sock=rnd(1,Math.min(b[5],6));
-  else if(rar!=="普通"&&b[5]>0&&Math.random()<0.15)sock=rnd(1,Math.min(b[5],4));
-  if(rar==="普通"&&b[5]>=4&&Math.random()<0.08)sock=rnd(4,Math.min(b[5],6));
-  var dispName=(affNames.length?affNames.join(" ")+" ":"")+b[0];
-  return{id:uid(),name:dispName,slot:b[1],il:il,req:req,rar:rar,mods:modsObj,bs:bs,id_ed:rar==="普通"||Math.random()<0.05,sock:sock,filled:[]};
+  if(b[5]>0){
+    if(rar==="普通"){
+      if(Math.random()<0.18)sock=rnd(1,Math.min(b[5],4));
+      if(b[5]>=6&&Math.random()<0.012)sock=6; /* 令人髮指的6洞 */
+      else if(b[5]>=5&&Math.random()<0.03)sock=5;
+      else if(b[5]>=4&&Math.random()<0.06)sock=4;
+    } else if(Math.random()<0.1){
+      sock=rnd(1,Math.min(b[5],3));
+    }
+  }
+  /* 白裝可帶少量詞綴（可符文） */
+  if(rar==="普通"&&sock>0&&Math.random()<0.35){
+    addAff(pp.filter(function(x){return x[2]<=2}),affPre);
+  }
+  var mid=pick(MID);
+  var dispName=(affPre.length?affPre.join("")+" ":"")+(rar==="普通"?"":mid)+(affPre.length||rar!=="普通"?" ":"")+b[0]+(affSuf.length?" "+affSuf.join(""):"");
+  if(rar==="普通"&&!affPre.length&&!affSuf.length)dispName=b[0];
+  return{id:uid(),name:dispName,slot:b[1],il:il,req:req,rar:rar,mods:modsObj,bs:bs,id_ed:rar==="普通"||Math.random()<0.04,sock:sock,filled:[],locked:false};
 }
 function handleLoot(it){
   var cfg=(S.auto&&S.auto.loot)?S.auto.loot:defAuto().loot;
@@ -927,7 +1198,7 @@ function doSellOne(id){
   if(!it.id_ed)v=Math.floor(v*0.35);S.gold+=v;S.items.splice(idx,1);log("出售 "+itemName(it)+" +"+v,"sys");save();renderAll();
 }
 function doSellByRarity(rar){
-  var list=S.items.filter(function(it){return !isEquipped(it.id)&&(rar==="all"||it.rar===rar)});
+  var list=S.items.filter(function(it){return !isEquipped(it.id)&&!it.locked&&(rar==="all"||it.rar===rar)});
   if(!list.length){log("沒有可出售物品","sys");return}
   askYes(rar==="all"?"出售全部未裝備（"+list.length+"件）？":"出售全部未裝備「"+rar+"」（"+list.length+"件）？",function(){
     var gold=0;list.forEach(function(it){
@@ -939,30 +1210,45 @@ function doSellByRarity(rar){
   });
 }
 function doIdentify(id){
-  if(!S.pot.idS){log("沒有鑑定卷軸","warn");return}
+  if(!S.pot.idS){
+    var price=28;
+    if(S.gold>=price){S.gold-=price;S.pot.idS=1;log("自動花費"+price+"金購買鑑定卷軸","sys")}
+    else{log("沒有鑑定卷軸且金幣不足（需"+price+"）","warn");return}
+  }
   var it=null;for(var i=0;i<S.items.length;i++)if(S.items[i].id===id){it=S.items[i];break}
   if(!it||it.id_ed)return;S.pot.idS--;it.id_ed=true;log("鑑定："+it.name+"（"+it.rar+"）","drop");save();renderAll();
 }
 function doIdentifyAll(){
-  var n=0;for(var i=0;i<S.items.length;i++){if(S.items[i].id_ed||isEquipped(S.items[i].id))continue;if(!S.pot.idS)break;S.pot.idS--;S.items[i].id_ed=true;n++}
+  var n=0,price=28;for(var i=0;i<S.items.length;i++){if(S.items[i].id_ed||isEquipped(S.items[i].id))continue;if(!S.pot.idS){if(S.gold>=price){S.gold-=price;S.pot.idS=1}else break}S.pot.idS--;S.items[i].id_ed=true;n++}
   log("一鍵鑑定 "+n+" 件","sys");save();renderAll();
 }
 function trySocket(itemId,runeId){
   var it=null;for(var i=0;i<S.items.length;i++)if(S.items[i].id===itemId){it=S.items[i];break}
-  if(!it||!it.id_ed)return;if(!it.sock||(it.filled||[]).length>=it.sock){log("無空凹槽","warn");return}
-  if(it.rar!=="普通"&&!it.rw){log("符文之語只能鑲嵌在白色（普通）有孔裝備上","warn");return}
-  var idx=S.runes.indexOf(runeId);if(idx<0){log("無此符文","warn");return}
-  S.runes.splice(idx,1);if(!it.filled)it.filled=[];it.filled.push(runeId);
+  if(!it||!it.id_ed)return;
+  if(!it.sock||(it.filled||[]).length>=it.sock){log("無空凹槽","warn");return}
+  if(it.rar!=="普通"&&!it.rw){log("符文之語只能鑲嵌在白色（普通）有孔裝備","warn");return}
+  var rn=RUNE_BY_ID[runeId]||RUNE_BY_ID[RUNE_MIG[runeId]];
+  var rname=rn?rn.n:runeId;
+  var idx=S.runes.indexOf(runeId); if(idx<0)idx=S.runes.indexOf(rname);
+  if(idx<0){log("無此符文","warn");return}
+  S.runes.splice(idx,1); if(!it.filled)it.filled=[]; it.filled.push(rname);
   var key=it.filled.join("+");
   for(var r=0;r<RUNEWORDS.length;r++){
-    if(RUNEWORDS[r].r.join("+")===key&&it.sock>=RUNEWORDS[r].s){
-      it.rw=RUNEWORDS[r].name;it.rwMods=Object.assign({},RUNEWORDS[r].m);
-      log("符文之語「"+it.rw+"」完成！","drop");save();renderAll();return;
+    var rw=RUNEWORDS[r];
+    if(rw.r.join("+")===key){
+      if(it.sock!==rw.s){log("洞數必須剛好為 "+rw.s+"（目前"+it.sock+"）才能完成「"+rw.name+"」","warn");save();renderAll();return}
+      /* 全身只能一件相同符文之語 */
+      var has=false;
+      Object.keys(S.eq).forEach(function(slot){
+        var id=S.eq[slot]; for(var j=0;j<S.items.length;j++)if(S.items[j].id===id&&S.items[j].rw===rw.name)has=true;
+      });
+      if(has){log("已裝備相同符文之語「"+rw.name+"」，無法再完成一件","warn");save();renderAll();return}
+      it.rw=rw.name; it.rwMods=Object.assign({},rw.m);
+      log("符文之語「"+it.rw+"」完成！","drop"); save(); renderAll(); return;
     }
   }
-  log("鑲嵌 "+runeId,"sys");save();renderAll();
+  log("鑲嵌 "+rname+(rn?" (#"+rn.num+")":""),"sys"); save(); renderAll();
 }
-
 function learnSkill(key){
   var sk=getSkill(key);if(!sk)return;var n=S.skills[key]||0;
   if(S.sp<1){log("技能點不足","warn");return}if(S.lv<sk.req){log("需等級 "+sk.req,"warn");return}if(n>=15){log("已滿級","warn");return}
@@ -1023,7 +1309,7 @@ function renderHero(){
     '<div class="info-grid">'+
       '<div class="info-box"><div class="t">基礎屬性</div>力量 '+S.str+'<br>敏捷 '+S.dex+'<br>體力 '+S.vit+'<br>能量 '+S.ene+'</div>'+
       '<div class="info-box"><div class="t">戰鬥</div>攻擊 '+t.a+'　法傷 '+t.sp+'<br>防禦 '+t.d+'　抗性 '+(m.res||0)+'<br>偷取 '+(m.lifeSteal||0)+'%　回血 '+(m.lifeRegen||0)+'</div>'+
-      '<div class="info-box"><div class="t">元素抗性</div>火 '+(m.fireRes||0)+'%　冰 '+(m.coldRes||0)+'%<br>雷 '+(m.lightRes||0)+'%　毒 '+(m.poisonRes||0)+'%<br>詛咒 '+(m.curseRes||0)+'%</div>'+
+      '<div class="info-box"><div class="t">元素抗性（含全抗）</div>火 '+tot().fireRes+'%　冰 '+tot().coldRes+'%<br>雷 '+tot().lightRes+'%　毒 '+tot().poisonRes+'%<br>詛咒 '+tot().curseRes+'%　減傷 '+(tot().dr||0)+'%<br>全技能+'+(m.allSkills||0)+'　職業技+'+(m.classSkills||0)+'</div>'+
       '<div class="info-box"><div class="t">召喚</div>上限 '+maxMinions()+'　目前 '+S.minions.length+'<br>召攻+'+(m.summonAtk||0)+'%　召血+'+(m.summonHp||0)+'%</div>'+
     '</div>'+
     '<div style="background:#12121a;border:1px solid var(--ln);border-radius:8px;padding:8px;margin:8px 0">'+
@@ -1082,7 +1368,7 @@ function renderSkills(){
           var n=S.skills[s.key]||0;
           return'<div class="sk-card" style="'+(locked?"opacity:0.5":"")+'"><div style="color:var(--b);font-weight:600">'+s.n+'</div>'+
             '<div class="mu">Lv'+n+'/15 · 需'+s.req+' · '+s.t+(s.t==="passive"?" · 常駐":"")+'</div>'+
-            '<div class="mu">'+s.d+'</div>'+
+            '<div class="mu">'+s.d+(s.mul?'（每級傷害係數約+8%）':s.t==="summon"?'（每級召攻/召血約+9%+12%）':s.t==="passive"?'（每級疊加）':'')+'</div>'+
             '<button class="sm btn-learn" data-key="'+s.key+'" style="margin-top:6px"'+(locked?" disabled":"")+'>'+(n?"強化":"學習")+'</button></div>';
         }).join("")+'</div>';
     }).join("");
@@ -1112,9 +1398,9 @@ function renderGear(){
 function renderRunes(){
   var cnt={};(S.runes||[]).forEach(function(r){cnt[r]=(cnt[r]||0)+1});
   var list=Object.keys(cnt).map(function(id){
-    var rn=null;for(var i=0;i<RUNES.length;i++)if(RUNES[i].id===id||RUNES[i].n===id){rn=RUNES[i];break}
+    var rn=RUNE_BY_ID[id]||null;if(!rn){for(var i=0;i<RUNES.length;i++)if(RUNES[i].id===id||RUNES[i].n===id){rn=RUNES[i];break}}
     var mods=rn?Object.keys(rn.m).map(function(k){return fmtAffix(k,rn.m[k])}).join(" · "):"";
-    return'<div class="item"><b>'+(rn?rn.n:id)+'</b> ×'+cnt[id]+' <span class="mu">'+mods+'</span></div>';
+    return'<div class="item"><b>'+(rn?rn.n:id)+'</b>'+(rn?' <span class="pill">#'+rn.num+'</span>':'')+' ×'+cnt[id]+' <span class="mu">'+mods+'</span></div>';
   }).join("")||'<div class="mu">無符文</div>';
   $("v-runes").innerHTML=list+'<div style="margin-top:12px"><b>符文之語配方</b> <span class="mu">（僅白裝有孔）</span></div>'+
     RUNEWORDS.map(function(rw){
@@ -1123,10 +1409,63 @@ function renderRunes(){
         '<div class="mu">'+Object.keys(rw.m).map(function(k){return fmtAffix(k,rw.m[k])}).join(" · ")+'</div></div>';
     }).join("");
 }
+function gamblePrice(kind){
+  /* 低消 30 萬；以上隨荷包上浮 */
+  var g=Math.max(0,S.gold||0);
+  var floor=300000;
+  if(g<=floor)return floor;
+  var rate=kind==="rune"?0.10:kind==="weapon"?0.14:0.12;
+  var base=Math.floor(g*rate);
+  return Math.max(floor, Math.min(base, Math.floor(g*0.40)));
+}
+function doGamble(kind){
+  var price=gamblePrice(kind);
+  if(S.gold<price){log("金幣不足（需"+price+"）","warn");return}
+  S.gold-=price;
+  if(kind==="rune"){
+    /* 高編號符文爆率令人髮指 */
+    var roll=Math.random(), pickR;
+    if(roll<0.70)pickR=pick(RUNES.filter(function(r){return r.num<=10}));
+    else if(roll<0.90)pickR=pick(RUNES.filter(function(r){return r.num>=11&&r.num<=20}));
+    else if(roll<0.97)pickR=pick(RUNES.filter(function(r){return r.num>=21&&r.num<=27}));
+    else if(roll<0.994)pickR=pick(RUNES.filter(function(r){return r.num>=28&&r.num<=31}));
+    else pickR=pick(RUNES.filter(function(r){return r.num>=32}));
+    S.runes.push(pickR.n);
+    log("賭符文：獲得「"+pickR.n+"」#"+pickR.num+"（-"+price+"金）","drop");
+  } else {
+    var bonus=0;
+    var rr=Math.random();
+    /* 比打怪更低的極品率 */
+    if(rr<0.70)bonus=0;
+    else if(rr<0.88)bonus=1;
+    else if(rr<0.96)bonus=2;
+    else if(rr<0.992)bonus=3;
+    else bonus=4;
+    var it=makeItem(bonus, rr>0.997);
+    if(kind==="weapon"){
+      /* 強制武器類 */
+      var tries=0;
+      while(it.slot!=="主手"&&it.slot!=="副手"&&tries++<8)it=makeItem(bonus,false);
+      if(it.slot!=="主手"&&it.slot!=="副手"){it.slot="主手";it.name="賭坊兵刃"}
+    }
+    it.id_ed=false; /* 必未鑑定 */
+    S.items.push(it);
+    log("賭"+(kind==="weapon"?"武器":"裝備")+"：獲得未鑑定物品（-"+price+"金）","drop");
+  }
+  save();renderAll();
+}
 function renderShop(){
-  $("v-shop").innerHTML='<div class="mu" style="margin-bottom:8px">無限庫存</div>'+
+  var pg=gamblePrice("gear"), pw=gamblePrice("weapon"), pr=gamblePrice("rune");
+  $("v-shop").innerHTML=
+    '<div class="notice" style="margin-bottom:10px">「黑市賭坊」<br>不標價、不保證。未鑑定的裝備、武器與符文，全憑手氣。<br>每次至少 <b style="color:var(--g)">30 萬金</b>；荷包越鼓，價碼越高。<br>有人在這裡翻身——也有人在這裡把金幣花光。<br><span style="color:var(--mu)">貨物開箱前皆為未鑑定。買定離手。</span></div>'+
+    '<div class="row" style="margin-bottom:10px">'+
+      '<button class="primary" id="btnGambleGear" style="flex:1">賭裝備<br><span class="mu">'+pg+' 金</span></button>'+
+      '<button class="primary" id="btnGambleWeapon" style="flex:1">賭武器<br><span class="mu">'+pw+' 金</span></button>'+
+      '<button class="primary" id="btnGambleRune" style="flex:1">賭符文<br><span class="mu">'+pr+' 金</span></button>'+
+    '</div>'+
+    '<div class="mu" style="margin-bottom:8px">常規補給（不限量）</div>'+
     POTIONS.map(function(p){return'<div class="item"><b>'+p.n+'</b> <span class="mu">'+p.p+'金</span><button class="sm btn-buy" data-id="'+p.id+'" style="float:right">購買</button></div>'}).join("")+
-    '<div class="notice">深淵藥僅精英/首領掉落</div>';
+    '<div class="notice">無鑑定卷軸時，鑑定會自動扣 28 金代購一卷（金幣足夠時）。</div>';
 }
 function renderAll(){if(!S)return;renderStatBar();renderHero();renderHunt();renderAuto();renderSkills();renderGear();renderRunes();renderShop();renderLog()}
 
@@ -1154,7 +1493,29 @@ function enterSlot(i){
   S.pot=Object.assign({hpS:3,mpS:3,town:1,idS:2},S.pot||{});
   S.items=(S.items||[]).map(function(it){return Object.assign({},it,{id_ed:it.id_ed!=null?it.id_ed:true,filled:migrateRunes(it.filled||[]),sock:it.sock||0,req:it.req!=null?it.req:Math.max(1,(it.il||1)-3)})});
   pack=[];
-  if(S.lastSave){var min=Math.floor((Date.now()-S.lastSave)/60000);if(min>=5){min=Math.min(min,360);var fights=Math.floor(min*0.4*(1+S.diff*0.1));if(fights>=1){var xp=0,gold=0;for(var f=0;f<fights;f++){xp+=Math.floor((8+S.lv*3)*DIFF[S.diff][2]*0.4);gold+=Math.floor((2+S.lv)*DIFF[S.diff][1]*0.4)}S.xp+=xp;S.gold+=gold;S.kills+=fights;levelUp();log("離線"+min+"分 +"+xp+"經驗 +"+gold+"金","sys")}}}
+  if(S.lastSave){
+    var min=Math.floor((Date.now()-S.lastSave)/60000);
+    if(min>=5){
+      min=Math.min(min,360);
+      var settleId=String(S.lastSave)+"_"+min;
+      if(S.lastSettlementId===settleId){/* 防重複 */}
+      else{
+        var fights=Math.floor(min*0.35*(1+S.diff*0.12));
+        if(fights>=1){
+          var xp=0,gold=0,drops=0;
+          for(var f=0;f<fights;f++){
+            xp+=Math.floor((8+S.lv*3)*DIFF[S.diff][2]*0.35);
+            gold+=Math.floor((2+S.lv)*DIFF[S.diff][1]*0.35);
+            if(Math.random()<0.08+S.diff*0.02){var it=makeItem(S.diff>=2?2:S.diff>=1?1:0,false);S.items.push(it);drops++;}
+          }
+          var maxDrop=Math.min(8,2+Math.floor(min/30));
+          while(drops>maxDrop){S.items.pop();drops--}
+          S.xp+=xp;S.gold+=gold;S.kills+=fights;S.lastSettlementId=settleId;levelUp();
+          log("離線"+min+"分 +"+xp+"經驗 +"+gold+"金"+(drops?" +裝備"+drops+"件":""),"sys");
+        }
+      }
+    }
+  }
   $("charSelect").classList.add("hidden");$("gameUI").classList.remove("hidden");
   log("進入遠征","sys");renderAll();switchTab("hero");
 }
@@ -1179,8 +1540,11 @@ document.addEventListener("click",function(ev){
   if(t.classList.contains("btn-sell-rar")){doSellByRarity(t.getAttribute("data-rar"));return}
   if(t.classList.contains("btn-id")){doIdentify(t.getAttribute("data-id"));return}
   if(t.id==="btnIdAll"){doIdentifyAll();return}
+  if(t.id==="btnGambleGear"){doGamble("gear");return}
+  if(t.id==="btnGambleWeapon"){doGamble("weapon");return}
+  if(t.id==="btnGambleRune"){doGamble("rune");return}
   if(t.classList.contains("btn-buy")){buyPot(t.getAttribute("data-id"));return}
-  if(t.classList.contains("btn-set")){var sn=t.getAttribute("data-set"),info=SETS_INFO[sn];if(info)showDlg("套裝："+sn,"<b>組成：</b>"+info.pieces.join("、")+"<br><br><b>加成：</b><br>"+info.bonus.join("<br>"));return}
+  if(t.classList.contains("btn-set")){var sn=t.getAttribute("data-set"),info=SETS_INFO[sn];if(info){var b='';if(info.bonus3)b+='<b>3件：</b>'+info.bonus3.join('、')+'<br>';if(info.bonus6)b+='<b>6件：</b>'+info.bonus6.join('、')+'<br>';if(info.bonus9)b+='<b>9件：</b>'+info.bonus9.join('、')+'（含全抗+50）<br>';if(info.bonus)b+=info.bonus.join('<br>');showDlg('套裝：'+sn,'<b>組成（9件）：</b>'+info.pieces.join('、')+'<br><br>'+b);return}}
   if(t.classList.contains("btn-rw")){var rn=t.getAttribute("data-rw");var rw=null;for(var i=0;i<RUNEWORDS.length;i++)if(RUNEWORDS[i].name===rn){rw=RUNEWORDS[i];break}if(rw)showDlg("符文之語："+rw.name,"<b>需要：</b>"+rw.r.join(" + ")+"<br><b>凹槽：</b>"+rw.s+"<br><b>類型：</b>"+rw.d+"<br><br><b>屬性：</b><br>"+Object.keys(rw.m).map(function(k){return fmtAffix(k,rw.m[k])}).join("<br>")+"<br><br><span class='mu'>僅可鑲嵌於白色（普通）有孔裝備</span>");return}
   if(t.classList.contains("btn-sock")){
     var iid=t.getAttribute("data-id");
@@ -1202,9 +1566,31 @@ $("btnCreate").onclick=function(){var name=($("newName").value||"遠征者").tri
 $("btnCancelCreate").onclick=function(){$("createArea").classList.add("hidden")};
 $("btnBack").onclick=function(){askYes("返回角色選擇？",function(){save();active=-1;S=null;pack=[];stopAuto();renderSelect()})};
 $("btnSave").onclick=function(){save();showDlg("提示","已儲存")};
-$("btnExport").onclick=function(){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify({slots:slots,active:active},null,2)],{type:"application/json"}));a.download="深淵遠征-存檔.json";a.click()};
+$("btnExport").onclick=function(){save();var pkg=buildExportPackage();var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(pkg,null,2)],{type:"application/json"}));a.download="深淵遠征-存檔.json";a.click();showDlg("提示","已匯出簽章存檔（schema v"+SCHEMA_VERSION+"）")};
 $("btnImport").onclick=function(){$("fileIn").click()};
-$("fileIn").onchange=function(e){var f=e.target.files[0];if(!f)return;var reader=new FileReader();reader.onload=function(){try{var x=JSON.parse(reader.result);if(x.slots){slots=x.slots;while(slots.length<2)slots.push(null);active=x.active!=null?x.active:-1}else if(x.cid){slots=[x,null];active=0}else throw 0;saveAll();if(active>=0&&slots[active])enterSlot(active);else renderSelect();showDlg("提示","匯入成功")}catch(err){showDlg("錯誤","格式錯誤")}};reader.readAsText(f);e.target.value=""};
+$("fileIn").onchange=function(e){
+  var f=e.target.files[0];if(!f)return;
+  if(f.size>2*1024*1024){showDlg("錯誤","檔案過大");e.target.value="";return}
+  var reader=new FileReader();
+  reader.onload=function(){
+    try{
+      var x=JSON.parse(reader.result);
+      var result=tryImportPackage(x);
+      if(!result.ok){
+        showDlg("匯入拒絕","存檔驗證失敗，<b>原存檔未改動</b>。<br><br>"+result.errors.map(function(er){return "• "+er}).join("<br>"));
+        e.target.value="";return;
+      }
+      pushBackup({slots:slots,active:active,schemaVersion:SCHEMA_VERSION});
+      slots=result.data.slots;while(slots.length<2)slots.push(null);
+      active=result.data.active!=null?result.data.active:-1;
+      saveAll();
+      if(active>=0&&slots[active])enterSlot(active);else renderSelect();
+      showDlg("提示",result.legacy?"舊格式已匯入（無簽章，已做規則檢查）":"簽章存檔匯入成功");
+    }catch(err){showDlg("錯誤","格式錯誤："+(err.message||err))}
+    e.target.value="";
+  };
+  reader.readAsText(f);
+};
 $("btnClearLog").onclick=function(){if(S){S.logs=[];renderLog()}};
 document.querySelectorAll("#tabs button").forEach(function(b){b.onclick=function(){switchTab(b.getAttribute("data-tab"))}});
 $("overlay").addEventListener("click",function(e){if(e.target===$("overlay"))$("overlay").classList.add("hidden")});
